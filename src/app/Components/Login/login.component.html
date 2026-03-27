@@ -1,0 +1,206 @@
+<div class="login-page" role="main">
+  <div class="bg" aria-hidden="true"></div>
+  <div class="bg-overlay" aria-hidden="true"></div>
+
+  <section class="card" aria-label="Formulario de inicio de sesión">
+    <header class="header">
+      <div class="logo" aria-hidden="true">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 10.5L12 3l9 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M5.5 9.9V21h13V9.9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M10 21v-7.2a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2V21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h1 class="title">Bienvenido a tu refugio rural</h1>
+      <p class="subtitle">Accede para gestionar tus reservas con calma y confianza.</p>
+    </header>
+
+    <form class="form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <div class="field">
+        <label class="label" for="email">Correo electrónico</label>
+        <input
+          id="email"
+          class="input"
+          type="email"
+          inputmode="email"
+          autocomplete="email"
+          placeholder="tu-correo@ejemplo.com"
+          formControlName="email"
+          [attr.aria-invalid]="form.controls.email.invalid && (form.controls.email.dirty || form.controls.email.touched)"
+        />
+        @if (form.controls.email.invalid && (form.controls.email.dirty || form.controls.email.touched)) {
+          <p class="error" role="alert">
+            @if (form.controls.email.errors?.['required']) { El correo es obligatorio. }
+            @else if (form.controls.email.errors?.['email']) { Ingresa un correo válido. }
+            @else { El correo es demasiado largo. }
+          </p>
+        }
+      </div>
+
+      <div class="field">
+        <label class="label" for="password">Contraseña</label>
+        <div class="password-wrap">
+          <input
+            id="password"
+            class="input"
+            [type]="showPassword() ? 'text' : 'password'"
+            autocomplete="current-password"
+            placeholder="••••••••"
+            formControlName="password"
+            [attr.aria-invalid]="form.controls.password.invalid && (form.controls.password.dirty || form.controls.password.touched)"
+          />
+          <button class="ghost" type="button" (click)="togglePasswordVisibility()">
+            {{ showPassword() ? 'Ocultar' : 'Ver' }}
+          </button>
+        </div>
+        @if (form.controls.password.invalid && (form.controls.password.dirty || form.controls.password.touched)) {
+          <p class="error" role="alert">
+            @if (form.controls.password.errors?.['required']) { La contraseña es obligatoria. }
+            @else if (form.controls.password.errors?.['minlength']) { Mínimo 8 caracteres. }
+            @else { La contraseña es demasiado larga. }
+          </p>
+        }
+      </div>
+
+      <div class="row">
+        <label class="remember">
+          <input type="checkbox" formControlName="rememberMe" />
+          <span>Recordarme</span>
+        </label>
+        <a class="link" href="#" (click)="$event.preventDefault()">¿Olvidaste tu contraseña?</a>
+      </div>
+
+      <button class="primary" type="submit" [disabled]="!canSubmit()">
+        <span>Iniciar sesión</span>
+        @if (isSubmitting()) {
+          <span class="spinner" aria-hidden="true"></span>
+        }
+      </button>
+
+      <div class="separator" role="separator" aria-label="o">
+        <span>o</span>
+      </div>
+
+      <button class="secondary" type="button" (click)="continueWithGoogle()">
+        <span class="google" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+            <path fill="#EA4335" d="M24 9.5c3.54 0 6.73 1.23 9.23 3.64l6.9-6.9C35.9 2.56 30.3 0 24 0 14.64 0 6.57 5.38 2.67 13.22l8.06 6.26C12.65 13.01 17.88 9.5 24 9.5z"/>
+            <path fill="#4285F4" d="M46.5 24c0-1.64-.15-3.22-.43-4.74H24v9.02h12.67c-.55 2.96-2.23 5.46-4.77 7.14l7.7 5.98C43.93 37.29 46.5 31.1 46.5 24z"/>
+            <path fill="#FBBC05" d="M10.73 28.52A14.5 14.5 0 0 1 9.96 24c0-1.57.27-3.09.77-4.52l-8.06-6.26A23.92 23.92 0 0 0 0 24c0 3.85.92 7.49 2.67 10.78l8.06-6.26z"/>
+            <path fill="#34A853" d="M24 48c6.3 0 11.6-2.08 15.47-5.62l-7.7-5.98c-2.14 1.44-4.88 2.29-7.77 2.29-6.12 0-11.35-3.51-13.27-8.52l-8.06 6.26C6.57 42.62 14.64 48 24 48z"/>
+          </svg>
+        </span>
+        <span>Continuar con Google</span>
+      </button>
+
+      <p class="footer">
+        ¿No tienes cuenta?
+        <a class="link" href="#" (click)="$event.preventDefault()">Regístrate</a>
+      </p>
+    </form>
+  </section>
+</div>
+
+<div class="login-page" role="main">
+  <div class="bg" aria-hidden="true"></div>
+  <div class="bg-overlay" aria-hidden="true"></div>
+
+  <section class="card" aria-label="Formulario de inicio de sesión">
+    <header class="header">
+      <div class="logo" aria-hidden="true">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 10.5L12 3l9 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M5.5 9.9V21h13V9.9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M10 21v-7.2a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2V21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h1 class="title">Bienvenido a tu refugio rural</h1>
+      <p class="subtitle">Accede para gestionar tus reservas con calma y confianza.</p>
+    </header>
+
+    <form class="form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <div class="field">
+        <label class="label" for="email">Correo electrónico</label>
+        <input
+          id="email"
+          class="input"
+          type="email"
+          inputmode="email"
+          autocomplete="email"
+          placeholder="tu-correo@ejemplo.com"
+          formControlName="email"
+          [attr.aria-invalid]="form.controls.email.invalid && (form.controls.email.dirty || form.controls.email.touched)"
+        />
+        @if (form.controls.email.invalid && (form.controls.email.dirty || form.controls.email.touched)) {
+          <p class="error" role="alert">
+            @if (form.controls.email.errors?.['required']) { El correo es obligatorio. }
+            @else if (form.controls.email.errors?.['email']) { Ingresa un correo válido. }
+            @else { El correo es demasiado largo. }
+          </p>
+        }
+      </div>
+
+      <div class="field">
+        <label class="label" for="password">Contraseña</label>
+        <div class="password-wrap">
+          <input
+            id="password"
+            class="input"
+            [type]="showPassword() ? 'text' : 'password'"
+            autocomplete="current-password"
+            placeholder="••••••••"
+            formControlName="password"
+            [attr.aria-invalid]="form.controls.password.invalid && (form.controls.password.dirty || form.controls.password.touched)"
+          />
+          <button class="ghost" type="button" (click)="togglePasswordVisibility()">
+            {{ showPassword() ? 'Ocultar' : 'Ver' }}
+          </button>
+        </div>
+        @if (form.controls.password.invalid && (form.controls.password.dirty || form.controls.password.touched)) {
+          <p class="error" role="alert">
+            @if (form.controls.password.errors?.['required']) { La contraseña es obligatoria. }
+            @else if (form.controls.password.errors?.['minlength']) { Mínimo 8 caracteres. }
+            @else { La contraseña es demasiado larga. }
+          </p>
+        }
+      </div>
+
+      <div class="row">
+        <label class="remember">
+          <input type="checkbox" formControlName="rememberMe" />
+          <span>Recordarme</span>
+        </label>
+        <a class="link" href="#" (click)="$event.preventDefault()">¿Olvidaste tu contraseña?</a>
+      </div>
+
+      <button class="primary" type="submit" [disabled]="!canSubmit()">
+        <span>Iniciar sesión</span>
+        @if (isSubmitting()) {
+          <span class="spinner" aria-hidden="true"></span>
+        }
+      </button>
+
+      <div class="separator" role="separator" aria-label="o">
+        <span>o</span>
+      </div>
+
+      <button class="secondary" type="button" (click)="continueWithGoogle()">
+        <span class="google" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+            <path fill="#EA4335" d="M24 9.5c3.54 0 6.73 1.23 9.23 3.64l6.9-6.9C35.9 2.56 30.3 0 24 0 14.64 0 6.57 5.38 2.67 13.22l8.06 6.26C12.65 13.01 17.88 9.5 24 9.5z"/>
+            <path fill="#4285F4" d="M46.5 24c0-1.64-.15-3.22-.43-4.74H24v9.02h12.67c-.55 2.96-2.23 5.46-4.77 7.14l7.7 5.98C43.93 37.29 46.5 31.1 46.5 24z"/>
+            <path fill="#FBBC05" d="M10.73 28.52A14.5 14.5 0 0 1 9.96 24c0-1.57.27-3.09.77-4.52l-8.06-6.26A23.92 23.92 0 0 0 0 24c0 3.85.92 7.49 2.67 10.78l8.06-6.26z"/>
+            <path fill="#34A853" d="M24 48c6.3 0 11.6-2.08 15.47-5.62l-7.7-5.98c-2.14 1.44-4.88 2.29-7.77 2.29-6.12 0-11.35-3.51-13.27-8.52l-8.06 6.26C6.57 42.62 14.64 48 24 48z"/>
+          </svg>
+        </span>
+        <span>Continuar con Google</span>
+      </button>
+
+      <p class="footer">
+        ¿No tienes cuenta?
+        <a class="link" href="#" (click)="$event.preventDefault()">Regístrate</a>
+      </p>
+    </form>
+  </section>
+</div>
+

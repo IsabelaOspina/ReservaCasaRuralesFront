@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F5F5DC"/>
+      <stop offset="0.55" stop-color="#E8E7D1"/>
+      <stop offset="1" stop-color="#D9D5C3"/>
+    </linearGradient>
+    <linearGradient id="mount" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6B8E23" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#2f3b18" stop-opacity="0.75"/>
+    </linearGradient>
+    <linearGradient id="hill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6B8E23" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#3b4b1c" stop-opacity="0.65"/>
+    </linearGradient>
+    <linearGradient id="earth" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#A0522D" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#6b3a22" stop-opacity="0.55"/>
+    </linearGradient>
+
+    <filter id="softBlur" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#sky)"/>
+  <g filter="url(#softBlur)">
+    <path d="M-50 560 L280 330 L540 520 L720 360 L980 560 L1200 410 L1460 560 L1700 430 L1700 920 L-50 920 Z" fill="url(#mount)"/>
+    <path d="M-50 640 L250 470 L520 650 L770 500 L1060 680 L1310 560 L1700 710 L1700 920 L-50 920 Z" fill="url(#hill)"/>
+  </g>
+  <g filter="url(#softBlur)" opacity="0.85">
+    <path d="M1040 540 L1180 440 L1320 540 Z" fill="#3a2a1f" opacity="0.35"/>
+    <rect x="1070" y="540" width="220" height="160" rx="10" fill="#ffffff" opacity="0.28"/>
+    <rect x="1090" y="575" width="70" height="60" rx="8" fill="#0b0f0a" opacity="0.20"/>
+    <rect x="1190" y="575" width="80" height="110" rx="10" fill="#0b0f0a" opacity="0.18"/>
+  </g>
+  <g filter="url(#softBlur)">
+    <path d="M-50 720 C300 640, 520 760, 820 700 C1120 640, 1320 760, 1700 690 L1700 920 L-50 920 Z" fill="url(#earth)"/>
+  </g>
+</svg>
+
