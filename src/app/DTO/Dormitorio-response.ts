@@ -1,5 +1,5 @@
 
-import { TipoCama } from './Dormitorio-request';
+import { TipoCama } from './dormitorio-request';
 
 export interface DormitorioResponse {
     idDormitorio: number;

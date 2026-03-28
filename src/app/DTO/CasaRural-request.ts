@@ -1,4 +1,4 @@
-import { FotoRequest } from './Foto-request';
+import { FotoRequest } from './foto-request';
 export interface CasaRuralRequest {
     poblacion: string;
     descripcion: string;

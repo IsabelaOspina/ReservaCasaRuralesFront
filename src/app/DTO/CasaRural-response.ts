@@ -1,4 +1,4 @@
-import { FotoResponse } from './Foto-response';
+import { FotoResponse } from './foto-response';
 export interface CasaRuralResponse {
     codigoCasa: number;
     poblacion: string;

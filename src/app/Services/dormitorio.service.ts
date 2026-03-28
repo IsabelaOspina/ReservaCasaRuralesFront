@@ -4,8 +4,8 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 
-import { DormitorioRequest } from '../DTO/Dormitorio-request';
-import { DormitorioResponse } from '../DTO/Dormitorio-response';
+import { DormitorioRequest } from '../DTO/dormitorio-request';
+import { DormitorioResponse } from '../DTO/dormitorio-response';
 
 @Injectable({
   providedIn: 'root'
