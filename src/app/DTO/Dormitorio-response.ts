@@ -1,4 +1,4 @@
-
+//prueba
 import { TipoCama } from './dormitorio-request';
 
 export interface DormitorioResponse {

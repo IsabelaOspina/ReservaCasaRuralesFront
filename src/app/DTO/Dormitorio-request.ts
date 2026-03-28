@@ -1,3 +1,4 @@
+//prueba
 export enum TipoCama {
     DOBLE = 'DOBLE',
     SENCILLA = 'SENCILLA',

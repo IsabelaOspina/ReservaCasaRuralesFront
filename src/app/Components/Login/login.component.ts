@@ -21,7 +21,7 @@ export class LoginComponent {
 
   protected readonly form = this.fb.nonNullable.group({
     correoElectronico: ['', [Validators.required, Validators.email]],
-    contraseña: ['', [Validators.required, Validators.minLength(8)]],
+    password: ['', [Validators.required, Validators.minLength(8)]], // ✅ corregido
     rememberMe: [true],
   });
 
@@ -40,7 +40,12 @@ export class LoginComponent {
 
     this.isSubmitting.set(true);
 
-    const data: LoginRequest = this.form.getRawValue();
+    const formValue = this.form.getRawValue();
+
+    const data: LoginRequest = {
+      correoElectronico: formValue.correoElectronico,
+      password: formValue.password
+    };
 
     this.authService.login(data).subscribe({
       next: (res: any) => {
