@@ -1,161 +1,283 @@
-<div class="registro-container">
-  <div class="registro-card">
-    <div class="registro-header">
-      <h2>Crear Cuenta</h2>
-      <p>Regístrate para comenzar a usar nuestros servicios</p>
-    </div>
+<div class="registro-page" role="main">
+  <div class="bg" aria-hidden="true"></div>
+  <div class="bg-overlay" aria-hidden="true"></div>
 
-    <!-- Mensajes de éxito y error -->
-    <div *ngIf="successMessage" class="alert alert-success">
-      {{ successMessage }}
-    </div>
-    
-    <div *ngIf="errorMessage" class="alert alert-error">
-      {{ errorMessage }}
-    </div>
+  <section class="card" aria-label="Formulario de registro">
+    <header class="header">
+      <div class="logo" aria-hidden="true">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path
+            d="M3 10.5L12 3l9 7.5"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M5.5 9.9V21h13V9.9"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M10 21v-7.2a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2V21"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </div>
+      <h1 class="title">Crear Cuenta</h1>
+      <p class="subtitle">Regístrate para comenzar a usar nuestros servicios de refugio rural</p>
+    </header>
 
-    <form (ngSubmit)="onSubmit()" #registroForm="ngForm">
-      <!-- Campo: Nombre -->
-      <div class="form-group">
-        <label for="nombre">Nombre Completo *</label>
-        <div class="input-group">
-          <span class="input-icon">👤</span>
-          <input 
-            type="text" 
-            id="nombre"
-            [(ngModel)]="registroData.nombre"
-            name="nombre"
-            class="form-control"
-            placeholder="Ingresa tu nombre completo"
-            required
-            [disabled]="loading">
+    @if (successMessage()) {
+      <p class="alert alert-success" role="status">{{ successMessage() }}</p>
+    }
+    @if (errorMessage()) {
+      <p class="alert alert-error" role="alert">{{ errorMessage() }}</p>
+    }
+
+    <form class="form" [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+      <div class="form-grid">
+        <!-- Nombre -->
+        <div class="field">
+          <label class="label" for="nombre">Nombre completo</label>
+          <div class="input-wrap">
+            <span class="input-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+            </span>
+            <input
+              id="nombre"
+              class="input"
+              [class.input--invalid]="fieldState('nombre') === 'invalid'"
+              [class.input--valid]="fieldState('nombre') === 'valid'"
+              type="text"
+              autocomplete="name"
+              formControlName="nombre"
+              placeholder="Tu nombre y apellidos"
+            />
+          </div>
+          <p class="hint">Obligatorio</p>
+          @if (form.get('nombre')?.invalid && (form.get('nombre')?.dirty || form.get('nombre')?.touched)) {
+            <p class="error" role="alert">
+              @if (form.get('nombre')?.errors?.['required']) {
+                Se requiere el nombre completo
+              }
+            </p>
+          }
+        </div>
+
+        <!-- Usuario -->
+        <div class="field">
+          <label class="label" for="usuario">Nombre de usuario</label>
+          <div class="input-wrap">
+            <span class="input-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <circle cx="12" cy="8" r="4" />
+                <path d="M4 20v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1" />
+              </svg>
+            </span>
+            <input
+              id="usuario"
+              class="input"
+              [class.input--invalid]="fieldState('usuario') === 'invalid'"
+              [class.input--valid]="fieldState('usuario') === 'valid'"
+              type="text"
+              autocomplete="username"
+              formControlName="usuario"
+              placeholder="Usuario para iniciar sesión"
+            />
+          </div>
+          <p class="hint">Se requiere el nombre de usuario · Mínimo 3 caracteres</p>
+          @if (form.get('usuario')?.invalid && (form.get('usuario')?.dirty || form.get('usuario')?.touched)) {
+            <p class="error" role="alert">
+              @if (form.get('usuario')?.errors?.['required']) {
+                Se requiere el nombre del usuario
+              } @else if (form.get('usuario')?.errors?.['minlength']) {
+                Mínimo 3 caracteres
+              }
+            </p>
+          }
+        </div>
+
+        <!-- Correo -->
+        <div class="field">
+          <label class="label" for="correoElectronico">Correo electrónico</label>
+          <div class="input-wrap">
+            <span class="input-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <rect x="2" y="5" width="20" height="14" rx="2" />
+                <path d="M2 7l10 7 10-7" />
+              </svg>
+            </span>
+            <input
+              id="correoElectronico"
+              class="input"
+              [class.input--invalid]="fieldState('correoElectronico') === 'invalid'"
+              [class.input--valid]="fieldState('correoElectronico') === 'valid'"
+              type="email"
+              inputmode="email"
+              autocomplete="email"
+              formControlName="correoElectronico"
+              placeholder="tu-correo@ejemplo.com"
+            />
+          </div>
+          <p class="hint">Obligatorio, formato válido</p>
+          @if (
+            form.get('correoElectronico')?.invalid &&
+            (form.get('correoElectronico')?.dirty || form.get('correoElectronico')?.touched)
+          ) {
+            <p class="error" role="alert">
+              @if (form.get('correoElectronico')?.errors?.['required']) {
+                El correo electrónico es obligatorio
+              } @else if (form.get('correoElectronico')?.errors?.['email']) {
+                Ingresa un correo electrónico válido
+              }
+            </p>
+          }
+        </div>
+
+        <!-- Teléfono -->
+        <div class="field">
+          <label class="label" for="telefonoContacto">Teléfono de contacto</label>
+          <div class="input-wrap">
+            <span class="input-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <path
+                  d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.77.62 2.6a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.48-1.19a2 2 0 0 1 2.11-.45c.83.29 1.7.5 2.6.62A2 2 0 0 1 22 16.92z"
+                />
+              </svg>
+            </span>
+            <input
+              id="telefonoContacto"
+              class="input"
+              [class.input--invalid]="fieldState('telefonoContacto') === 'invalid'"
+              [class.input--valid]="fieldState('telefonoContacto') === 'valid'"
+              type="tel"
+              inputmode="numeric"
+              autocomplete="tel"
+              formControlName="telefonoContacto"
+              placeholder="Ej. 3001234567"
+            />
+          </div>
+          <p class="hint">Solo números, entre 8 y 15 dígitos</p>
+          @if (
+            form.get('telefonoContacto')?.invalid &&
+            (form.get('telefonoContacto')?.dirty || form.get('telefonoContacto')?.touched)
+          ) {
+            <p class="error" role="alert">
+              @if (form.get('telefonoContacto')?.errors?.['required']) {
+                El teléfono es obligatorio
+              } @else if (form.get('telefonoContacto')?.errors?.['digitsOnly']) {
+                Solo se permiten números
+              } @else if (form.get('telefonoContacto')?.errors?.['phoneLength']) {
+                Debe tener entre 8 y 15 dígitos
+              }
+            </p>
+          }
+        </div>
+
+        <!-- Contraseña -->
+        <div class="field field--full">
+          <label class="label" for="password">Contraseña</label>
+          <div class="input-wrap input-wrap--password">
+            <span class="input-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <rect x="5" y="11" width="14" height="10" rx="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+            </span>
+            <input
+              id="password"
+              class="input"
+              [class.input--invalid]="fieldState('password') === 'invalid'"
+              [class.input--valid]="fieldState('password') === 'valid'"
+              [type]="showPassword() ? 'text' : 'password'"
+              autocomplete="new-password"
+              formControlName="password"
+              placeholder="Crea una contraseña segura"
+            />
+            <button
+              type="button"
+              class="toggle-pass"
+              (click)="togglePasswordVisibility()"
+              [attr.aria-pressed]="showPassword()"
+            >
+              {{ showPassword() ? 'Ocultar' : 'Ver' }}
+            </button>
+          </div>
+          <p class="hint">Mínimo 6 caracteres</p>
+          @if (form.get('password')?.invalid && (form.get('password')?.dirty || form.get('password')?.touched)) {
+            <p class="error" role="alert">
+              @if (form.get('password')?.errors?.['required']) {
+                La contraseña es obligatoria
+              } @else if (form.get('password')?.errors?.['minlength']) {
+                Mínimo 6 caracteres
+              }
+            </p>
+          }
+        </div>
+
+        <!-- Número cuenta -->
+        <div class="field field--full">
+          <label class="label" for="numeroCuenta">Número de cuenta</label>
+          <div class="input-wrap">
+            <span class="input-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <rect x="2" y="5" width="20" height="14" rx="2" />
+                <path d="M2 10h20" />
+                <path d="M6 15h4" />
+              </svg>
+            </span>
+            <input
+              id="numeroCuenta"
+              class="input"
+              [class.input--invalid]="fieldState('numeroCuenta') === 'invalid'"
+              [class.input--valid]="fieldState('numeroCuenta') === 'valid'"
+              type="text"
+              autocomplete="off"
+              formControlName="numeroCuenta"
+              placeholder="Número de cuenta bancaria"
+            />
+          </div>
+          <p class="hint">Obligatorio</p>
+          @if (
+            form.get('numeroCuenta')?.invalid &&
+            (form.get('numeroCuenta')?.dirty || form.get('numeroCuenta')?.touched)
+          ) {
+            <p class="error" role="alert">
+              @if (form.get('numeroCuenta')?.errors?.['required']) {
+                El número de cuenta es obligatorio
+              }
+            </p>
+          }
         </div>
       </div>
 
-      <!-- Campo: Usuario -->
-      <div class="form-group">
-        <label for="usuario">Nombre de Usuario *</label>
-        <div class="input-group">
-          <span class="input-icon">@</span>
-          <input 
-            type="text" 
-            id="usuario"
-            [(ngModel)]="registroData.usuario"
-            name="usuario"
-            class="form-control"
-            placeholder="El nombre que usarás para iniciar sesión"
-            required
-            minlength="3"
-            [disabled]="loading">
-        </div>
-        <small class="form-text">Mínimo 3 caracteres</small>
-      </div>
-
-      <!-- Campo: Contraseña -->
-      <div class="form-group">
-        <label for="contraseña">Contraseña *</label>
-        <div class="input-group">
-          <span class="input-icon">🔒</span>
-          <input 
-            [type]="showPassword ? 'text' : 'password'"
-            id="contraseña"
-            [(ngModel)]="registroData.password"
-            name="contraseña"
-            class="form-control"
-            placeholder="Crea una contraseña segura"
-            required
-            minlength="6"
-            [disabled]="loading">
-          <button 
-            type="button"
-            class="password-toggle"
-            (click)="togglePasswordVisibility()">
-            {{ showPassword ? '🙈' : '👁️' }}
-          </button>
-        </div>
-        <small class="form-text">Mínimo 6 caracteres</small>
-      </div>
-
-      <!-- Campo: Correo Electrónico -->
-      <div class="form-group">
-        <label for="correoElectronico">Correo Electrónico *</label>
-        <div class="input-group">
-          <span class="input-icon">📧</span>
-          <input 
-            type="email" 
-            id="correoElectronico"
-            [(ngModel)]="registroData.correoElectronico"
-            name="correoElectronico"
-            class="form-control"
-            placeholder="tu@email.com"
-            required
-            email
-            [disabled]="loading">
-        </div>
-      </div>
-
-      <!-- Campo: Teléfono de Contacto -->
-      <div class="form-group">
-        <label for="telefonoContacto">Teléfono de Contacto *</label>
-        <div class="input-group">
-          <span class="input-icon">📱</span>
-          <input 
-            type="tel" 
-            id="telefonoContacto"
-            [(ngModel)]="registroData.telefonoContacto"
-            name="telefonoContacto"
-            class="form-control"
-            placeholder="123456789"
-            required
-            pattern="[0-9]{8,15}"
-            [disabled]="loading">
-        </div>
-        <small class="form-text">Solo números, entre 8 y 15 dígitos</small>
-      </div>
-
-      <!-- Campo: Número de Cuenta -->
-      <div class="form-group">
-        <label for="numeroCuenta">Número de Cuenta *</label>
-        <div class="input-group">
-          <span class="input-icon">🏦</span>
-          <input 
-            type="text" 
-            id="numeroCuenta"
-            [(ngModel)]="registroData.numeroCuenta"
-            name="numeroCuenta"
-            class="form-control"
-            placeholder="Número de cuenta bancaria"
-            required
-            [disabled]="loading">
-        </div>
-      </div>
-
-      <!-- Botones de acción -->
-      <div class="form-actions">
-        <button 
-          type="submit" 
-          class="btn btn-primary"
-          [disabled]="loading || registroForm.invalid">
-          <span *ngIf="loading" class="spinner"></span>
-          {{ loading ? 'Registrando...' : 'Registrarse' }}
-        </button>
-        
-        <button 
-          type="button" 
-          class="btn btn-secondary"
-          (click)="resetFormulario()"
-          [disabled]="loading">
+      <div class="actions">
+        <button type="button" class="btn btn-secondary" (click)="limpiar()" [disabled]="loading()">
           Limpiar
         </button>
+        <button type="submit" class="btn btn-primary" [disabled]="!canSubmit()">
+          @if (loading()) {
+            <span class="spinner" aria-hidden="true"></span>
+          }
+          {{ loading() ? 'Registrando…' : 'Registrarse' }}
+        </button>
       </div>
 
-      <!-- Enlace para ir al login -->
-      <div class="login-link">
-        ¿Ya tienes cuenta? 
-        <a href="javascript:void(0)" (click)="irAlLogin()" class="link">
-          Inicia sesión aquí
-        </a>
-      </div>
+      <p class="login-line">
+        ¿Ya tienes cuenta?
+        <a routerLink="/login" class="login-link">Inicia sesión aquí</a>
+      </p>
+
+      <p class="brand" aria-hidden="true">RuralRefuge</p>
     </form>
-  </div>
+  </section>
 </div>

@@ -4,82 +4,130 @@
 
   <section class="card" aria-label="Formulario de inicio de sesión">
     <header class="header">
-      <h1 class="title">Bienvenido</h1>
+      <div class="logo" aria-hidden="true">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path
+            d="M3 10.5L12 3l9 7.5"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M5.5 9.9V21h13V9.9"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M10 21v-7.2a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2V21"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </div>
+      <h1 class="title">Bienvenido a tu refugio rural</h1>
       <p class="subtitle">Inicia sesión para continuar</p>
     </header>
 
-    <form [formGroup]="form" (ngSubmit)="submit()">
+    <form class="form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      @if (serverError(); as err) {
+        <p class="server-error" role="alert">{{ err }}</p>
+      }
 
-      <!-- CORREO -->
       <div class="field">
-        <label for="correoElectronico">Correo electrónico</label>
+        <label class="label" for="correoElectronico">Correo electrónico</label>
         <input
-          type="email"
           id="correoElectronico"
+          class="input"
+          [class.input--invalid]="fieldState('correoElectronico') === 'invalid'"
+          [class.input--valid]="fieldState('correoElectronico') === 'valid'"
+          type="email"
+          inputmode="email"
+          autocomplete="email"
           formControlName="correoElectronico"
-          placeholder="correo@ejemplo.com"
-          [attr.aria-invalid]="form.get('correoElectronico')?.invalid && (form.get('correoElectronico')?.dirty || form.get('correoElectronico')?.touched)"
+          placeholder="tu-correo@ejemplo.com"
+          [attr.aria-invalid]="
+            form.get('correoElectronico')?.invalid &&
+            (form.get('correoElectronico')?.dirty || form.get('correoElectronico')?.touched)
+          "
         />
-
-        <p class="error"
-           *ngIf="form.get('correoElectronico')?.invalid && (form.get('correoElectronico')?.dirty || form.get('correoElectronico')?.touched)">
-
-          <span *ngIf="form.get('correoElectronico')?.errors?.['required']">
-            El correo es obligatorio
-          </span>
-
-          <span *ngIf="form.get('correoElectronico')?.errors?.['email']">
-            Correo inválido
-          </span>
-
-        </p>
+        @if (
+          form.get('correoElectronico')?.invalid &&
+          (form.get('correoElectronico')?.dirty || form.get('correoElectronico')?.touched)
+        ) {
+          <p class="error" role="alert">
+            @if (form.get('correoElectronico')?.errors?.['required']) {
+              El correo electrónico es obligatorio
+            } @else if (form.get('correoElectronico')?.errors?.['email']) {
+              Ingresa un correo electrónico válido
+            }
+          </p>
+        }
       </div>
 
-      <!-- CONTRASEÑA -->
       <div class="field">
-        <label for="contraseña">Contraseña</label>
-
-        <div>
+        <label class="label" for="password">Contraseña</label>
+        <div class="password-wrap">
           <input
+            id="password"
+            class="input"
+            [class.input--invalid]="fieldState('password') === 'invalid'"
+            [class.input--valid]="fieldState('password') === 'valid'"
             [type]="showPassword() ? 'text' : 'password'"
-            id="contraseña"
-            formControlName="contraseña"
-            placeholder="********"
-            [attr.aria-invalid]="form.get('contraseña')?.invalid && (form.get('contraseña')?.dirty || form.get('contraseña')?.touched)"
+            autocomplete="current-password"
+            formControlName="password"
+            placeholder="••••••••"
+            [attr.aria-invalid]="
+              form.get('password')?.invalid &&
+              (form.get('password')?.dirty || form.get('password')?.touched)
+            "
           />
-
-          <button type="button" (click)="togglePasswordVisibility()">
+          <button
+            class="ghost"
+            type="button"
+            (click)="togglePasswordVisibility()"
+            [attr.aria-pressed]="showPassword()"
+          >
             {{ showPassword() ? 'Ocultar' : 'Ver' }}
           </button>
         </div>
-
-        <p class="error"
-           *ngIf="form.get('contraseña')?.invalid && (form.get('contraseña')?.dirty || form.get('contraseña')?.touched)">
-
-          <span *ngIf="form.get('contraseña')?.errors?.['required']">
-            La contraseña es obligatoria
-          </span>
-
-          <span *ngIf="form.get('contraseña')?.errors?.['minlength']">
-            Mínimo 8 caracteres
-          </span>
-
-        </p>
+        @if (
+          form.get('password')?.invalid &&
+          (form.get('password')?.dirty || form.get('password')?.touched)
+        ) {
+          <p class="error" role="alert">
+            @if (form.get('password')?.errors?.['required']) {
+              La contraseña es obligatoria
+            } @else if (form.get('password')?.errors?.['minlength']) {
+              La contraseña debe tener al menos 8 caracteres
+            }
+          </p>
+        }
       </div>
 
-      <!-- RECORDAR -->
-      <div>
-        <label>
+      <div class="row">
+        <label class="remember">
           <input type="checkbox" formControlName="rememberMe" />
-          Recordarme
+          <span>Recordarme</span>
         </label>
+        <a class="link link--muted" routerLink="/recuperar-contrasena">¿Olvidaste tu contraseña?</a>
       </div>
 
-      <!-- BOTÓN -->
-      <button type="submit" [disabled]="!canSubmit()">
-        Iniciar sesión
+      <button class="primary" type="submit" [disabled]="!canSubmit()">
+        <span>Iniciar sesión</span>
+        @if (isSubmitting()) {
+          <span class="spinner" aria-hidden="true"></span>
+        }
       </button>
 
+      <p class="footer">
+        ¿No tienes cuenta?
+        <a class="register-cta" routerLink="/registro">Regístrate</a>
+      </p>
     </form>
   </section>
 </div>
