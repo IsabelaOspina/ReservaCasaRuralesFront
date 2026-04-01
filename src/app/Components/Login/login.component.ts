@@ -18,6 +18,7 @@ const LS_REMEMBER = 'login_remember_me';
 export class LoginComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly authService = inject(AuthService);
+
   protected readonly isSubmitting = signal(false);
   protected readonly showPassword = signal(false);
   protected readonly serverError = signal<string | null>(null);
