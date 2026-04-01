@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../Services/auth.service';
@@ -29,9 +29,9 @@ export class LoginComponent implements OnInit {
     rememberMe: [true],
   });
 
-  protected readonly canSubmit = computed(
-    () => this.form.valid && !this.isSubmitting()
-  );
+  protected canSubmit(): boolean {
+    return this.form.valid && !this.isSubmitting();
+  }
 
   ngOnInit(): void {
     const remembered = localStorage.getItem(LS_REMEMBER) === 'true';

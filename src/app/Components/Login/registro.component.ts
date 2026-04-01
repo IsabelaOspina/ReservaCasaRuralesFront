@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import {
   AbstractControl,
   FormBuilder,
@@ -49,9 +49,9 @@ export class RegistroComponent {
     numeroCuenta: ['', [Validators.required]],
   });
 
-  protected readonly canSubmit = computed(
-    () => this.form.valid && !this.loading()
-  );
+  protected canSubmit(): boolean {
+    return this.form.valid && !this.loading();
+  }
 
   protected fieldState(
     name:
