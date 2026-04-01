@@ -1,4 +1,5 @@
-import { PagoRequest } from './pago-response';
+import { MetodoPago } from './pago-request';
+
 export interface PagoResponse {
   idPago: number;
   monto: number;
