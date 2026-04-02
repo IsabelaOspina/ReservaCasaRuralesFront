@@ -25,7 +25,7 @@ export class LoginComponent implements OnInit {
 
   protected readonly form = this.fb.nonNullable.group({
     correoElectronico: ['', [Validators.required, Validators.email]],
-    password: ['', [Validators.required, Validators.minLength(8)]],
+    password: ['', [Validators.required, Validators.minLength(6)]],
     rememberMe: [true],
   });
 
