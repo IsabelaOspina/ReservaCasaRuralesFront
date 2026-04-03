@@ -1,8 +1,9 @@
 import { CommonModule } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { AuthService } from '../../Services/usuario.service';
+import { UsuarioService } from '../../Services/usuario.service';
 import { LoginRequest } from '../../DTO/login-request';
 
 const LS_EMAIL = 'login_remember_email';
@@ -17,7 +18,7 @@ const LS_REMEMBER = 'login_remember_me';
 })
 export class LoginComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
-  private readonly authService = inject(AuthService);
+  private readonly usuarioService = inject(UsuarioService);
 
   protected readonly isSubmitting = signal(false);
   protected readonly showPassword = signal(false);
@@ -25,7 +26,7 @@ export class LoginComponent implements OnInit {
 
   protected readonly form = this.fb.nonNullable.group({
     correoElectronico: ['', [Validators.required, Validators.email]],
-    password: ['', [Validators.required, Validators.minLength(6)]],
+    password: ['', [Validators.required, Validators.minLength(8)]],
     rememberMe: [true],
   });
 
@@ -69,10 +70,10 @@ export class LoginComponent implements OnInit {
       password: raw.password,
     };
 
-    this.authService.login(data).subscribe({
-      next: (res) => {
-        if (res?.token) {
-          localStorage.setItem('token', res.token);
+    this.usuarioService.login(data).subscribe({
+      next: (token: string) => {
+        if (token) {
+          localStorage.setItem('token', token);
         }
         if (raw.rememberMe) {
           localStorage.setItem(LS_REMEMBER, 'true');
@@ -83,12 +84,21 @@ export class LoginComponent implements OnInit {
         }
         this.isSubmitting.set(false);
       },
-      error: (err) => {
+      error: (err: HttpErrorResponse) => {
+        const body = err.error;
+        const fromApi =
+          typeof body === 'object' &&
+          body !== null &&
+          'error' in body &&
+          typeof (body as { error: unknown }).error === 'string'
+            ? (body as { error: string }).error
+            : null;
         const msg =
-          err?.error?.error ??
-          err?.error?.message ??
+          fromApi ??
+          (typeof err.error === 'string' ? err.error : null) ??
+          err.message ??
           'No se pudo iniciar sesión. Intenta de nuevo.';
-        this.serverError.set(typeof msg === 'string' ? msg : 'Error al iniciar sesión');
+        this.serverError.set(msg);
         this.isSubmitting.set(false);
       },
     });

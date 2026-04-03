@@ -29,8 +29,8 @@
           />
         </svg>
       </div>
-      <h1 class="title">Crear Cuenta</h1>
-      <p class="subtitle">Regístrate para comenzar a usar nuestros servicios de refugio rural</p>
+      <h1 class="title">{{ tituloRegistro() }}</h1>
+      <p class="subtitle">{{ subtituloRegistro() }}</p>
     </header>
 
     @if (successMessage()) {
@@ -212,52 +212,84 @@
               {{ showPassword() ? 'Ocultar' : 'Ver' }}
             </button>
           </div>
-          <p class="hint">Mínimo 6 caracteres</p>
+          <p class="hint">Mínimo 8 caracteres</p>
           @if (form.get('password')?.invalid && (form.get('password')?.dirty || form.get('password')?.touched)) {
             <p class="error" role="alert">
               @if (form.get('password')?.errors?.['required']) {
                 La contraseña es obligatoria
               } @else if (form.get('password')?.errors?.['minlength']) {
-                Mínimo 6 caracteres
+                La contraseña debe tener al menos 8 caracteres
               }
             </p>
           }
         </div>
 
-        <!-- Número cuenta -->
-        <div class="field field--full">
-          <label class="label" for="numeroCuenta">Número de cuenta</label>
-          <div class="input-wrap">
-            <span class="input-icon" aria-hidden="true">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
-                <rect x="2" y="5" width="20" height="14" rx="2" />
-                <path d="M2 10h20" />
-                <path d="M6 15h4" />
-              </svg>
-            </span>
-            <input
-              id="numeroCuenta"
-              class="input"
-              [class.input--invalid]="fieldState('numeroCuenta') === 'invalid'"
-              [class.input--valid]="fieldState('numeroCuenta') === 'valid'"
-              type="text"
-              autocomplete="off"
-              formControlName="numeroCuenta"
-              placeholder="Número de cuenta bancaria"
-            />
+        @if (rol() === 'propietario') {
+          <!-- Número cuenta -->
+          <div class="field field--full">
+            <label class="label" for="numeroCuenta">Número de cuenta</label>
+            <div class="input-wrap">
+              <span class="input-icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                  <rect x="2" y="5" width="20" height="14" rx="2" />
+                  <path d="M2 10h20" />
+                  <path d="M6 15h4" />
+                </svg>
+              </span>
+              <input
+                id="numeroCuenta"
+                class="input"
+                [class.input--invalid]="fieldState('numeroCuenta') === 'invalid'"
+                [class.input--valid]="fieldState('numeroCuenta') === 'valid'"
+                type="text"
+                autocomplete="off"
+                formControlName="numeroCuenta"
+                placeholder="Número de cuenta bancaria"
+              />
+            </div>
+            <p class="hint">Obligatorio para propietarios</p>
+            @if (
+              form.get('numeroCuenta')?.invalid &&
+              (form.get('numeroCuenta')?.dirty || form.get('numeroCuenta')?.touched)
+            ) {
+              <p class="error" role="alert">
+                @if (form.get('numeroCuenta')?.errors?.['required']) {
+                  El número de cuenta es obligatorio
+                }
+              </p>
+            }
           </div>
-          <p class="hint">Obligatorio</p>
-          @if (
-            form.get('numeroCuenta')?.invalid &&
-            (form.get('numeroCuenta')?.dirty || form.get('numeroCuenta')?.touched)
-          ) {
-            <p class="error" role="alert">
-              @if (form.get('numeroCuenta')?.errors?.['required']) {
-                El número de cuenta es obligatorio
-              }
-            </p>
-          }
-        </div>
+
+          <div class="field field--full">
+            <label class="label" for="banco">Banco</label>
+            <div class="input-wrap">
+              <span class="input-icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                  <path d="M3 21h18M4 21V10l8-5 8 5v11" />
+                  <path d="M9 21v-6h6v6" />
+                </svg>
+              </span>
+              <input
+                id="banco"
+                class="input"
+                [class.input--invalid]="fieldState('banco') === 'invalid'"
+                [class.input--valid]="fieldState('banco') === 'valid'"
+                type="text"
+                autocomplete="organization"
+                formControlName="banco"
+                placeholder="Nombre del banco"
+              />
+            </div>
+            <p class="hint">Texto libre según tu entidad</p>
+            @if (form.get('banco')?.invalid && (form.get('banco')?.dirty || form.get('banco')?.touched)) {
+              <p class="error" role="alert">
+                @if (form.get('banco')?.errors?.['required']) {
+                  Indica el banco
+                }
+              </p>
+            }
+          </div>
+        }
       </div>
 
       <div class="actions">

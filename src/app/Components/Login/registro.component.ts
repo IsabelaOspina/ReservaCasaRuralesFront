@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import {
   AbstractControl,
   FormBuilder,
@@ -8,10 +9,10 @@ import {
   ValidatorFn,
   Validators,
 } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
-import { AuthService } from '../../Services/usuario.service';
-import { RegistroRequest } from '../../DTO/registro-request';
-import { RegistroResponse } from '../../DTO/registro-response';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { UsuarioService } from '../../Services/usuario.service';
+import { ClienteRequest } from '../../DTO/cliente-request';
+import { PropietarioRequest } from '../../DTO/propietario-request';
 
 function telefonoValidator(): ValidatorFn {
   return (control: AbstractControl): ValidationErrors | null => {
@@ -30,24 +31,62 @@ function telefonoValidator(): ValidatorFn {
   templateUrl: './registro.component.html',
   styleUrl: './registro.component.css',
 })
-export class RegistroComponent {
+export class RegistroComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
-  private readonly authService = inject(AuthService);
+  private readonly usuarioService = inject(UsuarioService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   protected readonly loading = signal(false);
   protected readonly showPassword = signal(false);
   protected readonly successMessage = signal('');
   protected readonly errorMessage = signal('');
 
+  protected readonly rol = signal<'cliente' | 'propietario'>(
+    (this.route.snapshot.data['rol'] as 'cliente' | 'propietario' | undefined) ?? 'cliente'
+  );
+
   protected readonly form = this.fb.nonNullable.group({
     nombre: ['', [Validators.required]],
     usuario: ['', [Validators.required, Validators.minLength(3)]],
     correoElectronico: ['', [Validators.required, Validators.email]],
     telefonoContacto: ['', [telefonoValidator()]],
-    password: ['', [Validators.required, Validators.minLength(6)]],
-    numeroCuenta: ['', [Validators.required]],
+    password: ['', [Validators.required, Validators.minLength(8)]],
+    numeroCuenta: [''],
+    banco: [''],
   });
+
+  ngOnInit(): void {
+    this.applyRolValidators();
+  }
+
+  private applyRolValidators(): void {
+    const nc = this.form.get('numeroCuenta');
+    const banco = this.form.get('banco');
+    if (this.rol() === 'propietario') {
+      nc?.setValidators([Validators.required]);
+      banco?.setValidators([Validators.required]);
+    } else {
+      nc?.clearValidators();
+      banco?.clearValidators();
+      nc?.setValue('');
+      banco?.setValue('');
+    }
+    nc?.updateValueAndValidity({ emitEvent: false });
+    banco?.updateValueAndValidity({ emitEvent: false });
+  }
+
+  protected tituloRegistro(): string {
+    return this.rol() === 'propietario'
+      ? 'Registro como propietario'
+      : 'Registro como cliente';
+  }
+
+  protected subtituloRegistro(): string {
+    return this.rol() === 'propietario'
+      ? 'Gestiona y publica tus casas rurales en la plataforma'
+      : 'Crea tu cuenta para reservar estancias y disfrutar del refugio rural';
+  }
 
   protected canSubmit(): boolean {
     return this.form.valid && !this.loading();
@@ -61,6 +100,7 @@ export class RegistroComponent {
       | 'telefonoContacto'
       | 'password'
       | 'numeroCuenta'
+      | 'banco'
   ): '' | 'invalid' | 'valid' {
     const c = this.form.get(name);
     if (!c) return '';
@@ -82,9 +122,25 @@ export class RegistroComponent {
       telefonoContacto: '',
       password: '',
       numeroCuenta: '',
+      banco: '',
     });
+    this.applyRolValidators();
     this.form.markAsPristine();
     this.form.markAsUntouched();
+  }
+
+  private static extractApiError(err: HttpErrorResponse): string {
+    const body = err.error;
+    if (typeof body === 'object' && body !== null) {
+      if ('error' in body && typeof (body as { error: unknown }).error === 'string') {
+        return (body as { error: string }).error;
+      }
+      if ('detalle' in body && typeof (body as { detalle: unknown }).detalle === 'string') {
+        return (body as { detalle: string }).detalle;
+      }
+    }
+    if (typeof body === 'string' && body.trim()) return body;
+    return err.message || 'Error al registrar';
   }
 
   protected onSubmit() {
@@ -95,50 +151,67 @@ export class RegistroComponent {
     if (this.form.invalid || this.loading()) return;
 
     const v = this.form.getRawValue();
-    const payload: RegistroRequest = {
-      nombre: v.nombre.trim(),
-      usuario: v.usuario.trim(),
-      password: v.password,
-      correoElectronico: v.correoElectronico.trim(),
-      telefonoContacto: v.telefonoContacto.replace(/\s/g, ''),
-      numeroCuenta: v.numeroCuenta.trim(),
-    };
-
     this.loading.set(true);
 
-    this.authService.registrar(payload).subscribe({
-      next: (response: RegistroResponse) => {
-        this.loading.set(false);
-        this.errorMessage.set('');
-        this.successMessage.set(`¡Registro exitoso! Bienvenido ${response.nombre}`);
-        this.form.reset({
-          nombre: '',
-          usuario: '',
-          correoElectronico: '',
-          telefonoContacto: '',
-          password: '',
-          numeroCuenta: '',
-        });
-        this.form.markAsPristine();
-        this.form.markAsUntouched();
-        setTimeout(() => this.router.navigate(['/login']), 2000);
-      },
-      error: (error) => {
-        this.loading.set(false);
-        const serverMsg =
-          error?.error?.error ??
-          error?.error?.message ??
-          (error.status === 409
-            ? 'El usuario o correo electrónico ya existe'
-            : error.status === 400
-              ? 'Datos inválidos. Verifica la información'
-              : error.status === 0
-                ? 'Error de conexión. Comprueba que el servidor esté disponible'
-                : 'Error al registrar. Intenta de nuevo');
-        this.errorMessage.set(
-          typeof serverMsg === 'string' ? serverMsg : 'Error al registrar'
-        );
-      },
+    if (this.rol() === 'cliente') {
+      const payload: ClienteRequest = {
+        username: v.usuario.trim(),
+        password: v.password,
+        nombre: v.nombre.trim(),
+        correoElectronico: v.correoElectronico.trim(),
+        telefonoContacto: v.telefonoContacto.replace(/\s/g, ''),
+      };
+      this.usuarioService.registrarCliente(payload).subscribe({
+        next: (text: string) => {
+          this.loading.set(false);
+          this.errorMessage.set('');
+          this.successMessage.set(text.trim() || 'Cliente registrado correctamente');
+          this.limpiarAfterSuccess();
+          setTimeout(() => this.router.navigate(['/login']), 2000);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.loading.set(false);
+          this.errorMessage.set(RegistroComponent.extractApiError(err));
+        },
+      });
+    } else {
+      const payload: PropietarioRequest = {
+        username: v.usuario.trim(),
+        password: v.password,
+        nombre: v.nombre.trim(),
+        correoElectronico: v.correoElectronico.trim(),
+        telefonoContacto: v.telefonoContacto.replace(/\s/g, ''),
+        numeroCuenta: v.numeroCuenta.trim(),
+        banco: v.banco.trim(),
+      };
+      this.usuarioService.registrarPropietario(payload).subscribe({
+        next: (text: string) => {
+          this.loading.set(false);
+          this.errorMessage.set('');
+          this.successMessage.set(text.trim() || 'Propietario registrado correctamente');
+          this.limpiarAfterSuccess();
+          setTimeout(() => this.router.navigate(['/login']), 2000);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.loading.set(false);
+          this.errorMessage.set(RegistroComponent.extractApiError(err));
+        },
+      });
+    }
+  }
+
+  private limpiarAfterSuccess(): void {
+    this.form.reset({
+      nombre: '',
+      usuario: '',
+      correoElectronico: '',
+      telefonoContacto: '',
+      password: '',
+      numeroCuenta: '',
+      banco: '',
     });
+    this.applyRolValidators();
+    this.form.markAsPristine();
+    this.form.markAsUntouched();
   }
 }

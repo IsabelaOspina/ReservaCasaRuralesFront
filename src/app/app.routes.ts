@@ -1,11 +1,19 @@
 import { Routes } from '@angular/router';
 import { LoginComponent } from './Components/Login/login.component';
 import { RegistroComponent } from './Components/Login/registro.component';
-import { RecuperarContrasenaPlaceholderComponent } from './Components/Login/recuperar-contrasena-placeholder.component';
 
 export const routes: Routes = [
-  { path: 'registro', component: RegistroComponent },
-  { path: 'recuperar-contrasena', component: RecuperarContrasenaPlaceholderComponent },
+  { path: 'registro', redirectTo: 'registro/cliente', pathMatch: 'full' },
+  {
+    path: 'registro/cliente',
+    component: RegistroComponent,
+    data: { rol: 'cliente' as const },
+  },
+  {
+    path: 'registro/propietario',
+    component: RegistroComponent,
+    data: { rol: 'propietario' as const },
+  },
   { path: 'login', component: LoginComponent },
   { path: '', redirectTo: '/login', pathMatch: 'full' },
 ];

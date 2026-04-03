@@ -11,19 +11,24 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(1200px 600px at 25% 20%, rgba(107, 142, 35, 0.25), transparent 55%),
-    radial-gradient(900px 500px at 85% 30%, rgba(160, 82, 45, 0.22), transparent 60%),
+    radial-gradient(1200px 600px at 25% 20%, rgba(107, 142, 35, 0.28), transparent 55%),
+    radial-gradient(900px 500px at 85% 30%, rgba(160, 82, 45, 0.24), transparent 60%),
     url("/images/rural-bg.svg");
   background-size: cover;
   background-position: center;
-  filter: blur(2px) saturate(1.05);
-  transform: scale(1.05);
+  filter: blur(6px) saturate(1.08);
+  transform: scale(1.08);
 }
 
 .bg-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(13, 18, 10, 0.52) 0%, rgba(10, 12, 9, 0.68) 100%);
+  background: linear-gradient(
+    165deg,
+    rgba(8, 12, 8, 0.55) 0%,
+    rgba(12, 14, 10, 0.62) 45%,
+    rgba(6, 8, 6, 0.72) 100%
+  );
 }
 
 .card {
@@ -193,6 +198,10 @@
   flex-wrap: wrap;
 }
 
+.row--remember {
+  justify-content: flex-start;
+}
+
 .remember {
   display: inline-flex;
   align-items: center;
@@ -208,30 +217,6 @@
   height: 1.05rem;
   accent-color: var(--rural-green);
   cursor: pointer;
-}
-
-.link {
-  color: var(--rural-earth);
-  text-decoration: none;
-  font-weight: 600;
-  font-size: 0.88rem;
-  transition: color 160ms ease, text-decoration-color 160ms ease;
-}
-
-.link:hover {
-  color: color-mix(in srgb, var(--rural-earth) 80%, black);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.link:focus-visible {
-  outline: 2px solid rgba(107, 142, 35, 0.5);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-
-.link--muted {
-  font-weight: 500;
 }
 
 .primary {
@@ -278,42 +263,65 @@
   outline-offset: 2px;
 }
 
-.footer {
-  margin: 1rem 0 0;
-  text-align: center;
-  color: var(--text-700);
-  font-size: 0.94rem;
+.register-block {
+  margin-top: 1.25rem;
+  padding-top: 1.15rem;
+  border-top: 1px solid rgba(160, 82, 45, 0.18);
 }
 
-.register-cta {
-  display: inline-block;
-  margin-left: 0.25rem;
-  padding: 0.35rem 0.75rem;
-  border-radius: 10px;
+.register-intro {
+  margin: 0 0 0.75rem;
+  text-align: center;
+  color: var(--text-700);
+  font-size: 0.92rem;
+  font-weight: 500;
+}
+
+.register-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.btn-register {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0.72rem 0.85rem;
+  border-radius: 12px;
+  font-size: 0.88rem;
   font-weight: 600;
-  color: var(--rural-earth);
+  font-family: inherit;
   text-decoration: none;
-  border: 1px solid rgba(160, 82, 45, 0.45);
-  background: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
   transition:
     background 160ms ease,
     border-color 160ms ease,
+    color 160ms ease,
     box-shadow 160ms ease,
     transform 120ms ease;
 }
 
-.register-cta:hover {
-  background: rgba(245, 245, 220, 0.95);
-  border-color: rgba(160, 82, 45, 0.65);
-  box-shadow: 0 4px 14px rgba(160, 82, 45, 0.15);
+.btn-register--outline {
+  color: var(--rural-earth);
+  background: rgba(255, 255, 255, 0.88);
+  border: 2px solid rgba(107, 142, 35, 0.45);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
-.register-cta:active {
+.btn-register--outline:hover {
+  background: rgba(245, 245, 220, 0.65);
+  border-color: rgba(107, 142, 35, 0.65);
+  box-shadow: 0 4px 14px rgba(107, 142, 35, 0.18);
+}
+
+.btn-register--outline:active {
   transform: translateY(1px);
 }
 
-.register-cta:focus-visible {
-  outline: 2px solid rgba(160, 82, 45, 0.5);
+.btn-register:focus-visible {
+  outline: 2px solid rgba(107, 142, 35, 0.55);
   outline-offset: 2px;
 }
 
@@ -335,6 +343,12 @@
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 560px) {
+  .register-actions {
+    grid-template-columns: 1fr;
   }
 }
 

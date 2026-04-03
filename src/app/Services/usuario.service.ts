@@ -18,12 +18,11 @@ export class UsuarioService {
   constructor(private http: HttpClient) {}
 
 
-  // LOGIN
+  // LOGIN — respuesta 200: texto plano "token:<JWT>"
   login(data: LoginRequest): Observable<string> {
-    return this.http.post(`${this.apiUrl}/login`, data, { responseType: 'text' })
-      .pipe(
-        map(resp => resp.replace('token:', ''))
-      );
+    return this.http.post(`${this.apiUrl}/login`, data, { responseType: 'text' }).pipe(
+      map((resp) => resp.replace(/^token:\s*/i, '').trim())
+    );
   }
   // REGISTRAR CLIENTE
   registrarCliente(data: ClienteRequest): Observable<string> {

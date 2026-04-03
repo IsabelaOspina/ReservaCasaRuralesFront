@@ -103,18 +103,17 @@
             @if (form.get('password')?.errors?.['required']) {
               La contraseña es obligatoria
             } @else if (form.get('password')?.errors?.['minlength']) {
-              La contraseña debe tener al menos 6 caracteres
+              La contraseña debe tener al menos 8 caracteres
             }
           </p>
         }
       </div>
 
-      <div class="row">
+      <div class="row row--remember">
         <label class="remember">
           <input type="checkbox" formControlName="rememberMe" />
           <span>Recordarme</span>
         </label>
-        <a class="link link--muted" routerLink="/recuperar-contrasena">¿Olvidaste tu contraseña?</a>
       </div>
 
       <button class="primary" type="submit" [disabled]="!canSubmit()">
@@ -124,10 +123,17 @@
         }
       </button>
 
-      <p class="footer">
-        ¿No tienes cuenta?
-        <a class="register-cta" routerLink="/registro">Regístrate</a>
-      </p>
+      <div class="register-block">
+        <p class="register-intro">¿No tienes cuenta?</p>
+        <div class="register-actions">
+          <a class="btn-register btn-register--outline" routerLink="/registro/cliente">
+            Registro como cliente
+          </a>
+          <a class="btn-register btn-register--outline" routerLink="/registro/propietario">
+            Registro como propietario
+          </a>
+        </div>
+      </div>
     </form>
   </section>
 </div>
