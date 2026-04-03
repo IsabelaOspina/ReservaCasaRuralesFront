@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { AuthService } from '../../Services/auth.service';
+import { AuthService } from '../../Services/usuario.service';
 import { LoginRequest } from '../../DTO/login-request';
 
 const LS_EMAIL = 'login_remember_email';

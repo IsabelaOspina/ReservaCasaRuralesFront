@@ -1,9 +1,9 @@
-// registro-request.ts
-export interface RegistroRequest {
+export interface PropietarioRequest {
+  username: string;
+  password: string;
   nombre: string;
-  usuario: string;
-  password: string;  
   correoElectronico: string;
   telefonoContacto: string;
   numeroCuenta: string;
+  banco: string;
 }
