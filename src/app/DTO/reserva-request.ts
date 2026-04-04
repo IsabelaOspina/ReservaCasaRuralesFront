@@ -4,4 +4,5 @@ export interface ReservaRequest {
   casaId: number;
   paqueteId: number;
   dormitoriosIds: number[];
+  telefonoContacto: string;
 }
