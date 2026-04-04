@@ -4,6 +4,7 @@ export enum TipoCama {
 }
 export interface DormitorioRequest {
     numeroCamas: number;
+    nombre: string;
     tipoCama: TipoCama;
     tieneBano: boolean;
 }
