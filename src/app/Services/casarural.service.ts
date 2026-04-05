@@ -14,15 +14,25 @@ export class CasaRuralService {
 
   constructor(private http: HttpClient) {}
 
-  registrarCasa(propietarioId: number, data: CasaRuralRequest): Observable<CasaRuralResponse> {
-    return this.http.post<CasaRuralResponse>(`${this.apiUrl}/registrar/${propietarioId}`, data);
-  }
-
-  /**
-   * Detalle de casa por código (fotos, descripción, etc.).
-   * Ajusta la ruta si tu controlador usa otro mapping (ej. `/casa_rural/obtener/{id}`).
-   */
-  obtenerCasaPorCodigo(codigoCasa: number): Observable<CasaRuralResponse> {
-    return this.http.get<CasaRuralResponse>(`${this.apiUrl}/${codigoCasa}`);
+  registrarCasa(data: CasaRuralRequest): Observable<CasaRuralResponse> {
+  
+    const formData = new FormData();
+    
+    // Añadir campos simples
+    formData.append('poblacion', data.poblacion);
+    formData.append('descripcion', data.descripcion);
+    formData.append('numeroDormitorios', data.numeroDormitorios.toString());
+    formData.append('numeroBanos', data.numeroBanos.toString());
+    formData.append('numeroCocinas', data.numeroCocinas.toString());
+    formData.append('numeroComedores', data.numeroComedores.toString());
+    formData.append('plazasGaraje', data.plazasGaraje.toString());
+    
+    // Añadir fotos y descripciones
+    data.fotos.forEach((foto, index) => {
+      formData.append('fotos', foto);
+      formData.append('descripcionesFotos', data.descripcionesFotos[index]);
+    });
+    
+    return this.http.post<CasaRuralResponse>(`${this.apiUrl}/registrar`, formData);
   }
 }
