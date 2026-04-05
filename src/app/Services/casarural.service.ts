@@ -17,4 +17,12 @@ export class CasaRuralService {
   registrarCasa(propietarioId: number, data: CasaRuralRequest): Observable<CasaRuralResponse> {
     return this.http.post<CasaRuralResponse>(`${this.apiUrl}/registrar/${propietarioId}`, data);
   }
+
+  /**
+   * Detalle de casa por código (fotos, descripción, etc.).
+   * Ajusta la ruta si tu controlador usa otro mapping (ej. `/casa_rural/obtener/{id}`).
+   */
+  obtenerCasaPorCodigo(codigoCasa: number): Observable<CasaRuralResponse> {
+    return this.http.get<CasaRuralResponse>(`${this.apiUrl}/${codigoCasa}`);
+  }
 }

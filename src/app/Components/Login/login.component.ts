@@ -2,8 +2,9 @@ import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { UsuarioService } from '../../Services/usuario.service';
+import { resolvePostLoginRoute } from '../../core/auth/jwt.util';
 import { LoginRequest } from '../../DTO/login-request';
 
 const LS_EMAIL = 'login_remember_email';
@@ -19,6 +20,7 @@ const LS_REMEMBER = 'login_remember_me';
 export class LoginComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly usuarioService = inject(UsuarioService);
+  private readonly router = inject(Router);
 
   protected readonly isSubmitting = signal(false);
   protected readonly showPassword = signal(false);
@@ -83,6 +85,9 @@ export class LoginComponent implements OnInit {
           localStorage.removeItem(LS_EMAIL);
         }
         this.isSubmitting.set(false);
+        if (token) {
+          void this.router.navigateByUrl(resolvePostLoginRoute(token));
+        }
       },
       error: (err: HttpErrorResponse) => {
         const body = err.error;

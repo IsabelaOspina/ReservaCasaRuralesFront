@@ -1,0 +1,245 @@
+<div class="dash">
+  <header class="top">
+    <div>
+      <h1>Área cliente</h1>
+      <p class="muted">Reservas, disponibilidad y pagos</p>
+      <p class="lede">
+        Indica el <strong>código de la casa rural</strong> que quieres reservar (el propietario puede pasártelo),
+        luego carga paquetes y habitaciones para comprobar fechas y completar la reserva.
+      </p>
+    </div>
+    <button type="button" class="btn-logout" (click)="logout()">Cerrar sesión</button>
+  </header>
+
+  @if (error(); as e) {
+    <p class="alert alert-err" role="alert">{{ e }}</p>
+  }
+  @if (success(); as s) {
+    <p class="alert alert-ok" role="status">{{ s }}</p>
+  }
+
+  <section class="panel">
+    <h2>1. Código de casa</h2>
+    <form class="row" [formGroup]="codigoForm" (ngSubmit)="cargarDatosCasa()">
+      <label>
+        <span>Código casa</span>
+        <input type="number" min="1" formControlName="codigo" />
+      </label>
+      <button type="submit" class="btn-primary" [disabled]="loadingPaquetes()">
+        {{ loadingPaquetes() ? 'Cargando…' : 'Cargar paquetes y dormitorios' }}
+      </button>
+    </form>
+    @if (codigoCasa() != null) {
+      <p class="hint">Casa activa: <strong>{{ codigoCasa() }}</strong></p>
+    }
+
+    @if (casaDetalle(); as casa) {
+      <div class="casa-ficha">
+        <h3 class="casa-ficha__title">La casa</h3>
+        <p class="casa-ficha__poblacion">{{ casa.poblacion }}</p>
+        <p class="casa-ficha__desc">{{ casa.descripcion }}</p>
+        @if (casa.fotos.length) {
+          <div class="foto-grid" role="list">
+            @for (f of casa.fotos; track f.url) {
+              <figure class="foto-card" role="listitem">
+                @if (urlFotoSegura(f.url); as src) {
+                  <div class="foto-card__img-wrap">
+                    <img
+                      [src]="src"
+                      [alt]="f.descripcion || 'Foto del alojamiento'"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </div>
+                  @if (f.descripcion) {
+                    <figcaption class="foto-card__cap">{{ f.descripcion }}</figcaption>
+                  }
+                } @else {
+                  <p class="foto-card__bad-url">
+                    {{ f.descripcion || 'Imagen' }}: enlace no válido para vista previa.
+                  </p>
+                }
+              </figure>
+            }
+          </div>
+        } @else {
+          <p class="muted">Esta casa aún no tiene fotos registradas.</p>
+        }
+      </div>
+    } @else if (codigoCasa() != null && !loadingPaquetes()) {
+      <p class="muted foto-aviso">
+        No pudimos cargar aquí la ficha con fotos de esta casa. Puedes pedir al propietario el enlace o las
+        imágenes directamente.
+      </p>
+    }
+  </section>
+
+  <section class="panel">
+    <h2>2. Disponibilidad</h2>
+    <form [formGroup]="dispForm" (ngSubmit)="verificarDisponibilidad()">
+      <div class="grid2">
+        <label>
+          <span>Fecha inicio</span>
+          <input type="date" formControlName="fechaInicio" />
+        </label>
+        <label>
+          <span>Noches</span>
+          <input type="number" min="1" formControlName="noches" />
+        </label>
+      </div>
+      <button type="submit" class="btn-secondary" [disabled]="loadingDisp() || codigoCasa() == null">
+        {{ loadingDisp() ? 'Comprobando…' : 'Comprobar disponibilidad' }}
+      </button>
+    </form>
+    @if (disponibilidadResult(); as dr) {
+      <p [class]="dr.ok ? 'disp-ok' : 'disp-bad'" role="status">
+        {{ dr.ok ? 'Disponible' : 'No disponible' }} — {{ dr.msg }}
+      </p>
+    }
+  </section>
+
+  <section class="panel">
+    <h2>3. Paquetes (precios)</h2>
+    @if (paquetes().length === 0) {
+      <p class="muted">Carga un código de casa para ver paquetes.</p>
+    } @else {
+      <ul class="list-compact">
+        @for (p of paquetes(); track p.idPaquete) {
+          <li>
+            <strong>#{{ p.idPaquete }}</strong> — {{ p.fechaInicio }} → {{ p.fechaFin }} ·
+            {{ p.precio | number: '1.2-2' }} € · {{ p.tipoAlquiler }}
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
+  <section class="panel">
+    <h2>4. Dormitorios (opcionales en la reserva)</h2>
+    @if (dormitorios().length === 0) {
+      <p class="muted">Sin dormitorios cargados.</p>
+    } @else {
+      <ul class="dorm-list">
+        @for (d of dormitorios(); track d.idDormitorio) {
+          <li>
+            <label class="chk">
+              <input
+                type="checkbox"
+                [checked]="isDormSelected(d.idDormitorio)"
+                (change)="toggleDorm(d.idDormitorio)"
+              />
+              {{ d.nombre }} ({{ d.idDormitorio }}) — {{ d.tipoCama }}, {{ d.numeroCamas }} cama(s)
+            </label>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
+  <section class="panel">
+    <h2>5. Nueva reserva</h2>
+    <form [formGroup]="reservaForm" (ngSubmit)="crearReserva()">
+      <div class="grid2">
+        <label>
+          <span>Fecha inicio</span>
+          <input type="date" formControlName="fechaInicio" />
+        </label>
+        <label>
+          <span>Noches</span>
+          <input type="number" min="1" formControlName="noches" />
+        </label>
+        <label class="span2">
+          <span>Paquete</span>
+          <select formControlName="paqueteId">
+            @for (p of paquetes(); track p.idPaquete) {
+              <option [ngValue]="p.idPaquete">
+                #{{ p.idPaquete }} — {{ p.precio | number: '1.2-2' }} € ({{ p.tipoAlquiler }})
+              </option>
+            }
+          </select>
+        </label>
+        <label class="span2">
+          <span>Teléfono contacto (opcional)</span>
+          <input type="tel" formControlName="telefonoContacto" placeholder="+57300…" />
+        </label>
+      </div>
+      <button type="submit" class="btn-primary" [disabled]="loadingReserva() || codigoCasa() == null || paquetes().length === 0">
+        {{ loadingReserva() ? 'Creando…' : 'Crear reserva' }}
+      </button>
+    </form>
+    @if (ultimaReserva(); as ur) {
+      <div class="reserva-box">
+        <h3>Última reserva en esta sesión</h3>
+        <p>
+          Id <strong>{{ ur.id }}</strong> · {{ ur.fechaInicio }} → {{ ur.fechaFin }} · {{ ur.noches }} noches ·
+          confirmada: {{ ur.confirmada ? 'sí' : 'no' }}
+        </p>
+        <p class="muted">Límite pago: {{ ur.fechaLimitePago }}</p>
+      </div>
+    }
+  </section>
+
+  <section class="panel">
+    <h2>6. Pagos</h2>
+    <p class="hint-pagos">
+      Primero revisa el resumen de importes y datos bancarios; si no cargan, puedes registrar el pago directamente
+      abajo.
+    </p>
+    <form [formGroup]="pagoForm" class="pago-grid" (ngSubmit)="registrarPago()">
+      <label>
+        <span>Reserva ID</span>
+        <input type="number" min="1" formControlName="reservaId" />
+      </label>
+      <div class="btn-row">
+        <button type="button" class="btn-secondary" (click)="cargarInfoPago()">Ver info transferencia</button>
+        <button type="button" class="btn-secondary" (click)="listarPagosReserva()">Listar pagos</button>
+      </div>
+      @if (pagoInfo(); as info) {
+        <div class="info-pago">
+          <p>Total: <strong>{{ info.totalAPagar | number: '1.2-2' }}</strong> €</p>
+          <p>Anticipo mínimo: <strong>{{ info.anticipoReserva | number: '1.2-2' }}</strong> €</p>
+          <p>Saldo restante: <strong>{{ info.saldoRestante | number: '1.2-2' }}</strong> €</p>
+          <p>Banco: {{ info.banco }} · Cuenta: {{ info.numeroCuenta }}</p>
+        </div>
+      }
+      @if (pagosLista().length) {
+        <ul class="list-compact">
+          @for (pg of pagosLista(); track pg.idPago) {
+            <li>
+              #{{ pg.idPago }} — {{ pg.monto | number: '1.2-2' }} € · {{ pg.metodoPago }} · {{ pg.fechaPago }} ·
+              {{ pg.confirmado ? 'confirmado' : 'pendiente' }}
+            </li>
+          }
+        </ul>
+      }
+      <h3>Registrar pago</h3>
+      <div class="grid2">
+        <label>
+          <span>Monto</span>
+          <input type="number" step="0.01" min="0.01" formControlName="monto" />
+        </label>
+        <label>
+          <span>Método</span>
+          <select formControlName="metodoPago">
+            @for (m of metodosPago; track m) {
+              <option [ngValue]="m">{{ m }}</option>
+            }
+          </select>
+        </label>
+        <label>
+          <span>Fecha pago</span>
+          <input type="date" formControlName="fechaPago" />
+        </label>
+        <label class="chk-inline">
+          <input type="checkbox" formControlName="confirmado" />
+          <span>Confirmado</span>
+        </label>
+      </div>
+      <button type="submit" class="btn-primary" [disabled]="loadingPagos()">Registrar pago</button>
+    </form>
+  </section>
+
+  <p class="footer-nav">
+    <a routerLink="/login">Ir al login</a>
+  </p>
+</div>
