@@ -1,279 +1,657 @@
-<div class="dash">
-  <header class="top">
-    <div>
-      <h1>Área propietario</h1>
-      <p class="muted">Alta de casas rurales, paquetes, dormitorios y cocinas</p>
-      <p class="lede">
-        Al dar de alta una casa, su código queda disponible en la lista inferior para que gestiones precios y
-        estancias sin tener que recordarlo cada vez.
-      </p>
+<div class="prop-shell">
+  <aside class="prop-sidebar" aria-label="Navegación del panel">
+    <div class="prop-sidebar__logo" aria-hidden="true">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path
+          d="M3 10.5L12 3l9 7.5"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+        <path
+          d="M5.5 9.9V21h13V9.9"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+        <path
+          d="M10 21v-7.2a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2V21"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+      <span>RuralRefuge</span>
     </div>
-    <button type="button" class="btn-logout" (click)="logout()">Cerrar sesión</button>
-  </header>
+    <nav class="prop-sidebar__nav">
+      <button
+        type="button"
+        class="prop-nav-btn"
+        [class.prop-nav-btn--active]="tab() === 'casa'"
+        (click)="setTab('casa')"
+      >
+        Alta casa
+      </button>
+      <button
+        type="button"
+        class="prop-nav-btn"
+        [class.prop-nav-btn--active]="tab() === 'paquetes'"
+        (click)="setTab('paquetes')"
+      >
+        Paquetes
+      </button>
+      <button
+        type="button"
+        class="prop-nav-btn"
+        [class.prop-nav-btn--active]="tab() === 'dormitorios'"
+        (click)="setTab('dormitorios')"
+      >
+        Dormitorios
+      </button>
+      <button
+        type="button"
+        class="prop-nav-btn"
+        [class.prop-nav-btn--active]="tab() === 'cocinas'"
+        (click)="setTab('cocinas')"
+      >
+        Cocinas
+      </button>
+    </nav>
+    <a class="prop-sidebar__link" routerLink="/login">Volver al acceso</a>
+  </aside>
 
-  @if (error(); as e) {
-    <p class="alert alert-err" role="alert">{{ e }}</p>
-  }
-  @if (success(); as s) {
-    <p class="alert alert-ok" role="status">{{ s }}</p>
-  }
-
-  <nav class="tabs" aria-label="Secciones">
-    <button type="button" [class.active]="tab() === 'casa'" (click)="setTab('casa')">Alta casa</button>
-    <button type="button" [class.active]="tab() === 'paquetes'" (click)="setTab('paquetes')">Paquetes</button>
-    <button type="button" [class.active]="tab() === 'dormitorios'" (click)="setTab('dormitorios')">
-      Dormitorios
-    </button>
-    <button type="button" [class.active]="tab() === 'cocinas'" (click)="setTab('cocinas')">Cocinas</button>
-  </nav>
-
-  @if (tab() === 'casa') {
-    <section class="panel">
-      <h2>Registrar casa rural</h2>
-      <form [formGroup]="propietarioUrlForm" class="inline-row">
-        <label>
-          <span>ID en la ruta de registro (opcional)</span>
-          <input type="number" min="0" formControlName="propietarioId" />
-          <span class="field-hint">Puedes dejar 0; no afecta al alta según la API actual.</span>
-        </label>
-      </form>
-      <form [formGroup]="casaForm" (ngSubmit)="registrarCasa()" novalidate>
-        <div class="grid2">
-          <label class="span2">
-            <span>Población</span>
-            <input type="text" formControlName="poblacion" />
-          </label>
-          <label class="span2">
-            <span>Descripción</span>
-            <textarea rows="2" formControlName="descripcion"></textarea>
-          </label>
-          <label>
-            <span>Dormitorios (≥3)</span>
-            <input type="number" min="3" formControlName="numeroDormitorios" />
-          </label>
-          <label>
-            <span>Baños (≥2)</span>
-            <input type="number" min="2" formControlName="numeroBanos" />
-          </label>
-          <label>
-            <span>Cocinas (≥1)</span>
-            <input type="number" min="1" formControlName="numeroCocinas" />
-          </label>
-          <label>
-            <span>Comedores</span>
-            <input type="number" min="0" formControlName="numeroComedores" />
-          </label>
-          <label>
-            <span>Plazas garaje</span>
-            <input type="number" min="0" formControlName="plazasGaraje" />
-          </label>
-        </div>
-        <h3>Fotos</h3>
-        @for (g of fotosRows.controls; track $index; let i = $index) {
-          <div class="foto-row" [formGroup]="$any(g)">
-            <label>
-              <span>URL de la imagen</span>
-              <input type="text" formControlName="url" inputmode="url" autocomplete="off" placeholder="https://…" />
-            </label>
-            <label>
-              <span>Descripción</span>
-              <input type="text" formControlName="descripcion" />
-            </label>
-            @if (fotosRows.length > 1) {
-              <button type="button" class="btn-mini" (click)="removeFotoRow(i)">Quitar</button>
-            }
-          </div>
-        }
-        <button type="button" class="btn-secondary" (click)="addFotoRow()">Añadir foto</button>
-        <button type="submit" class="btn-primary" [disabled]="loading()">
-          {{ loading() ? 'Enviando…' : 'Registrar casa' }}
-        </button>
-      </form>
-      @if (ultimaAlta(); as u) {
-        <p class="hint">
-          Última respuesta: código casa <strong>{{ u.codigoCasa }}</strong> · {{ u.poblacion }}
-        </p>
-      }
-    </section>
-  }
-
-  <section class="panel panel-select">
-    <h2>Tus casas</h2>
-    @if (casasLocales().length === 0) {
-      <p class="muted">Registra una casa en la pestaña «Alta casa» para verla aquí.</p>
-    } @else {
-      <div class="chips">
-        @for (c of casasLocales(); track c.codigoCasa) {
-          <button
-            type="button"
-            class="chip"
-            [class.chip--on]="codigoActivo() === c.codigoCasa"
-            (click)="seleccionarCasa(c.codigoCasa)"
-          >
-            {{ c.codigoCasa }} — {{ c.poblacion }}
-          </button>
+  <div class="prop-main">
+    <header class="prop-header">
+      <div class="prop-header__titles">
+        <h1 class="prop-header__title">Panel de Gestión</h1>
+        @if (codigoActivo() != null) {
+          <p class="prop-header__editing">
+            Editando: <strong>{{ tituloCasaActiva() }}</strong>
+            <span class="prop-header__code">· Código {{ codigoActivo() }}</span>
+          </p>
+        } @else {
+          <p class="prop-header__editing prop-header__editing--muted">
+            Selecciona una casa de la lista o registra una nueva en «Alta casa».
+          </p>
         }
       </div>
+      <div class="prop-header__actions">
+        <button type="button" class="btn btn--ghost" (click)="irVistaPrevia()">Vista previa (cliente)</button>
+        <button type="button" class="btn btn--outline" (click)="logout()">Cerrar sesión</button>
+      </div>
+    </header>
+
+    <section class="prop-casas" aria-label="Tus casas">
+      <h2 class="prop-casas__label">Tus casas</h2>
+      @if (casasLocales().length === 0) {
+        <p class="prop-casas__empty">Aún no hay casas registradas en este dispositivo.</p>
+      } @else {
+        <div class="prop-chips">
+          @for (c of casasLocales(); track c.codigoCasa) {
+            <button
+              type="button"
+              class="prop-chip"
+              [class.prop-chip--on]="codigoActivo() === c.codigoCasa"
+              (click)="seleccionarCasa(c.codigoCasa)"
+            >
+              <span class="prop-chip__code">#{{ c.codigoCasa }}</span>
+              <span class="prop-chip__name">{{ c.poblacion }}</span>
+            </button>
+          }
+        </div>
+      }
+    </section>
+
+    <nav class="prop-tabs" aria-label="Secciones del panel">
+      <button
+        type="button"
+        class="prop-tab"
+        [class.prop-tab--active]="tab() === 'casa'"
+        (click)="setTab('casa')"
+      >
+        Alta casa
+      </button>
+      <button
+        type="button"
+        class="prop-tab"
+        [class.prop-tab--active]="tab() === 'paquetes'"
+        (click)="setTab('paquetes')"
+      >
+        Paquetes
+      </button>
+      <button
+        type="button"
+        class="prop-tab"
+        [class.prop-tab--active]="tab() === 'dormitorios'"
+        (click)="setTab('dormitorios')"
+      >
+        Dormitorios
+      </button>
+      <button
+        type="button"
+        class="prop-tab"
+        [class.prop-tab--active]="tab() === 'cocinas'"
+        (click)="setTab('cocinas')"
+      >
+        Cocinas
+      </button>
+    </nav>
+
+    @if (error(); as e) {
+      <p class="alert alert--err" role="alert">{{ e }}</p>
     }
-    @if (codigoActivo() != null) {
-      <p class="hint">Editando datos de casa código <strong>{{ codigoActivo() }}</strong></p>
+    @if (success(); as s) {
+      <p class="alert alert--ok" role="status">{{ s }}</p>
     }
-  </section>
 
-  @if (tab() === 'paquetes') {
-    <section class="panel">
-      <h2>Paquetes de alquiler</h2>
-      @if (paquetes().length) {
-        <ul class="list-compact">
-          @for (p of paquetes(); track p.idPaquete) {
-            <li>
-              <button type="button" class="linkish" (click)="rellenarEdicionPaquete(p)">
-                #{{ p.idPaquete }}
-              </button>
-              — {{ p.fechaInicio }} → {{ p.fechaFin }} · {{ p.precio | number: '1.2-2' }} € · {{ p.tipoAlquiler }}
-            </li>
-          }
-        </ul>
-      } @else {
-        <p class="muted">Sin paquetes o carga una casa activa.</p>
-      }
+    <div class="prop-work">
+      <main class="prop-content">
+        @if (tab() === 'casa') {
+          <article class="card">
+            <h2 class="card__title">Registrar casa rural</h2>
+            <form class="card__form" [formGroup]="casaForm" (ngSubmit)="registrarCasa()" novalidate>
+              <div class="form-grid">
+                <label class="form-field span-2">
+                  <span class="form-label">Población</span>
+                  <input
+                    type="text"
+                    formControlName="poblacion"
+                    placeholder="Ej. Valldemossa"
+                    [class.input--invalid]="fieldStateCasa('poblacion') === 'invalid'"
+                    [class.input--valid]="fieldStateCasa('poblacion') === 'valid'"
+                    autocomplete="address-level2"
+                  />
+                  @if (
+                    casaForm.get('poblacion')?.invalid &&
+                    (casaForm.get('poblacion')?.dirty || casaForm.get('poblacion')?.touched)
+                  ) {
+                    <span class="form-error" role="alert">La población es obligatoria.</span>
+                  }
+                </label>
+                <label class="form-field span-2">
+                  <span class="form-label">Descripción</span>
+                  <textarea
+                    rows="4"
+                    formControlName="descripcion"
+                    placeholder="Describe el alojamiento, entorno y servicios relevantes."
+                    [class.input--invalid]="fieldStateCasa('descripcion') === 'invalid'"
+                    [class.input--valid]="fieldStateCasa('descripcion') === 'valid'"
+                  ></textarea>
+                  @if (
+                    casaForm.get('descripcion')?.invalid &&
+                    (casaForm.get('descripcion')?.dirty || casaForm.get('descripcion')?.touched)
+                  ) {
+                    <span class="form-error" role="alert">La descripción es obligatoria.</span>
+                  }
+                </label>
+                <label class="form-field">
+                  <span class="form-label">Número de dormitorios</span>
+                  <input
+                    type="number"
+                    min="3"
+                    formControlName="numeroDormitorios"
+                    [class.input--invalid]="fieldStateCasa('numeroDormitorios') === 'invalid'"
+                    [class.input--valid]="fieldStateCasa('numeroDormitorios') === 'valid'"
+                  />
+                  @if (casaForm.get('numeroDormitorios')?.invalid && (casaForm.get('numeroDormitorios')?.dirty || casaForm.get('numeroDormitorios')?.touched)) {
+                    <span class="form-error" role="alert">Mínimo 3.</span>
+                  }
+                </label>
+                <label class="form-field">
+                  <span class="form-label">Número de baños</span>
+                  <input
+                    type="number"
+                    min="2"
+                    formControlName="numeroBanos"
+                    [class.input--invalid]="fieldStateCasa('numeroBanos') === 'invalid'"
+                    [class.input--valid]="fieldStateCasa('numeroBanos') === 'valid'"
+                  />
+                  @if (casaForm.get('numeroBanos')?.invalid && (casaForm.get('numeroBanos')?.dirty || casaForm.get('numeroBanos')?.touched)) {
+                    <span class="form-error" role="alert">Mínimo 2.</span>
+                  }
+                </label>
+                <label class="form-field">
+                  <span class="form-label">Número de cocinas</span>
+                  <input
+                    type="number"
+                    min="1"
+                    formControlName="numeroCocinas"
+                    [class.input--invalid]="fieldStateCasa('numeroCocinas') === 'invalid'"
+                    [class.input--valid]="fieldStateCasa('numeroCocinas') === 'valid'"
+                  />
+                  @if (casaForm.get('numeroCocinas')?.invalid && (casaForm.get('numeroCocinas')?.dirty || casaForm.get('numeroCocinas')?.touched)) {
+                    <span class="form-error" role="alert">Mínimo 1.</span>
+                  }
+                </label>
+                <label class="form-field">
+                  <span class="form-label">Comedores</span>
+                  <input
+                    type="number"
+                    min="0"
+                    formControlName="numeroComedores"
+                    [class.input--invalid]="fieldStateCasa('numeroComedores') === 'invalid'"
+                    [class.input--valid]="fieldStateCasa('numeroComedores') === 'valid'"
+                  />
+                </label>
+                <label class="form-field span-2">
+                  <span class="form-label">Plazas de garaje</span>
+                  <input
+                    type="number"
+                    min="0"
+                    formControlName="plazasGaraje"
+                    [class.input--invalid]="fieldStateCasa('plazasGaraje') === 'invalid'"
+                    [class.input--valid]="fieldStateCasa('plazasGaraje') === 'valid'"
+                  />
+                </label>
+              </div>
 
-      <h3>Nuevo paquete</h3>
-      <form [formGroup]="paqueteForm" (ngSubmit)="crearPaquete()">
-        <div class="grid2">
-          <label>
-            <span>Inicio</span>
-            <input type="date" formControlName="fechaInicio" />
-          </label>
-          <label>
-            <span>Fin</span>
-            <input type="date" formControlName="fechaFin" />
-          </label>
-          <label>
-            <span>Precio / noche</span>
-            <input type="number" step="0.01" formControlName="precio" />
-          </label>
-          <label>
-            <span>Tipo alquiler</span>
-            <select formControlName="tipoAlquiler">
-              @for (t of tiposAlquiler; track t) {
-                <option [ngValue]="t">{{ t }}</option>
+              <div class="fotos-block">
+                <div class="fotos-block__head">
+                  <div>
+                    <h3 class="fotos-block__title">Fotografías</h3>
+                    <p class="fotos-block__hint">
+                      Adjunta imágenes desde tu dispositivo. Cada foto requiere descripción; el envío es multipart al
+                      registrar la casa.
+                    </p>
+                  </div>
+                  <button type="button" class="btn btn--add-foto" (click)="addFotoRow()">Añadir foto</button>
+                </div>
+                @for (g of fotosRows.controls; track $index; let i = $index) {
+                  <div class="foto-block" [formGroup]="$any(g)">
+                    <div class="foto-block__row">
+                      <label class="form-field">
+                        <span class="form-label">Imagen {{ i + 1 }}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          class="input-file"
+                          (change)="onFotoSeleccionada($event, i)"
+                        />
+                        <span class="input-file-name">{{ nombreArchivoFoto(i) }}</span>
+                      </label>
+                      <label class="form-field">
+                        <span class="form-label">Descripción de la imagen</span>
+                        <input
+                          type="text"
+                          formControlName="descripcion"
+                          placeholder="Ej. Fachada principal"
+                          [class.input--invalid]="fieldStateFotoDesc(i) === 'invalid'"
+                          [class.input--valid]="fieldStateFotoDesc(i) === 'valid'"
+                        />
+                        @if (
+                          fotosRows.at(i).get('descripcion')!.invalid &&
+                          (fotosRows.at(i).get('descripcion')!.dirty ||
+                            fotosRows.at(i).get('descripcion')!.touched)
+                        ) {
+                          <span class="form-error" role="alert">Descripción obligatoria.</span>
+                        }
+                      </label>
+                      @if (fotosRows.length > 1) {
+                        <button type="button" class="btn btn--mini" (click)="removeFotoRow(i)">Quitar</button>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+
+              <div class="form-actions">
+                <button type="submit" class="btn btn--primary btn--block" [disabled]="!canRegistrarCasa()">
+                  {{ loading() ? 'Enviando…' : 'Registrar casa' }}
+                </button>
+              </div>
+            </form>
+            @if (ultimaAlta(); as u) {
+              <p class="card__footnote">Último alta: código <strong>{{ u.codigoCasa }}</strong> · {{ u.poblacion }}</p>
+            }
+          </article>
+        }
+
+        @if (tab() === 'paquetes') {
+          <article class="card">
+            <h2 class="card__title">Paquetes de alquiler</h2>
+            @if (paquetes().length) {
+              <div class="data-grid data-grid--paquetes" role="list">
+                @for (p of paquetes(); track p.idPaquete) {
+                  <article class="data-card data-card--paquete" role="listitem">
+                    <div class="data-card__head">
+                      <span class="data-card__badge">#{{ p.idPaquete }}</span>
+                      <span class="data-card__chip">{{ etiquetaTipoAlquiler(p.tipoAlquiler) }}</span>
+                    </div>
+                    <p class="data-card__dates">
+                      <span class="data-card__date">{{ p.fechaInicio }}</span>
+                      <span class="data-card__arrow" aria-hidden="true">→</span>
+                      <span class="data-card__date">{{ p.fechaFin }}</span>
+                    </p>
+                    <p class="data-card__price">{{ p.precio | number: '1.2-2' }} € <span class="data-card__unit">/ noche</span></p>
+                    <button type="button" class="btn btn--sm btn--secondary" (click)="rellenarEdicionPaquete(p)">
+                      Editar en formulario
+                    </button>
+                  </article>
+                }
+              </div>
+            } @else {
+              <p class="muted-block">Sin paquetes listados. Elige una casa arriba o crea uno nuevo.</p>
+            }
+
+            <h3 class="card__subtitle">Nuevo paquete</h3>
+            <form [formGroup]="paqueteForm" (ngSubmit)="crearPaquete()" class="card__form-block">
+              <div class="form-grid">
+                <label class="form-field">
+                  <span class="form-label">Inicio</span>
+                  <input
+                    type="date"
+                    formControlName="fechaInicio"
+                    [class.input--invalid]="fieldStatePaquete('fechaInicio') === 'invalid'"
+                    [class.input--valid]="fieldStatePaquete('fechaInicio') === 'valid'"
+                  />
+                </label>
+                <label class="form-field">
+                  <span class="form-label">Fin</span>
+                  <input
+                    type="date"
+                    formControlName="fechaFin"
+                    [class.input--invalid]="fieldStatePaquete('fechaFin') === 'invalid'"
+                    [class.input--valid]="fieldStatePaquete('fechaFin') === 'valid'"
+                  />
+                </label>
+                @if (paqueteFechasInvalidas('nuevo')) {
+                  <p class="form-error span-2" role="alert">La fecha fin debe ser posterior o igual al inicio.</p>
+                }
+                <label class="form-field">
+                  <span class="form-label">Precio por noche</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    formControlName="precio"
+                    [class.input--invalid]="fieldStatePaquete('precio') === 'invalid'"
+                    [class.input--valid]="fieldStatePaquete('precio') === 'valid'"
+                  />
+                  @if (paqueteForm.get('precio')?.invalid && (paqueteForm.get('precio')?.dirty || paqueteForm.get('precio')?.touched)) {
+                    <span class="form-error" role="alert">Indica un precio mayor que 0.</span>
+                  }
+                </label>
+                <label class="form-field">
+                  <span class="form-label">Tipo de alquiler</span>
+                  <select
+                    formControlName="tipoAlquiler"
+                    [class.input--invalid]="fieldStatePaquete('tipoAlquiler') === 'invalid'"
+                    [class.input--valid]="fieldStatePaquete('tipoAlquiler') === 'valid'"
+                  >
+                    @for (t of tiposAlquiler; track t) {
+                      <option [ngValue]="t">{{ t }}</option>
+                    }
+                  </select>
+                </label>
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn--primary btn--block" [disabled]="!canCrearPaquete()">Crear paquete</button>
+              </div>
+            </form>
+
+            <h3 class="card__subtitle">Actualizar paquete</h3>
+            <p class="card__help">Usa «Editar en formulario» en una tarjeta superior para rellenar los datos.</p>
+            <form [formGroup]="paqueteEditForm" (ngSubmit)="actualizarPaquete()" class="card__form-block">
+              <div class="form-grid">
+                <label class="form-field">
+                  <span class="form-label">Id paquete</span>
+                  <input type="number" min="1" formControlName="idPaquete" />
+                </label>
+                <label class="form-field">
+                  <span class="form-label">Inicio</span>
+                  <input
+                    type="date"
+                    formControlName="fechaInicio"
+                    [class.input--invalid]="fieldStatePaquete('fechaInicio', 'edit') === 'invalid'"
+                    [class.input--valid]="fieldStatePaquete('fechaInicio', 'edit') === 'valid'"
+                  />
+                </label>
+                <label class="form-field">
+                  <span class="form-label">Fin</span>
+                  <input
+                    type="date"
+                    formControlName="fechaFin"
+                    [class.input--invalid]="fieldStatePaquete('fechaFin', 'edit') === 'invalid'"
+                    [class.input--valid]="fieldStatePaquete('fechaFin', 'edit') === 'valid'"
+                  />
+                </label>
+                @if (paqueteFechasInvalidas('edit')) {
+                  <p class="form-error span-2" role="alert">La fecha fin debe ser posterior o igual al inicio.</p>
+                }
+                <label class="form-field">
+                  <span class="form-label">Precio</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    formControlName="precio"
+                    [class.input--invalid]="fieldStatePaquete('precio', 'edit') === 'invalid'"
+                    [class.input--valid]="fieldStatePaquete('precio', 'edit') === 'valid'"
+                  />
+                </label>
+                <label class="form-field span-2">
+                  <span class="form-label">Tipo</span>
+                  <select formControlName="tipoAlquiler">
+                    @for (t of tiposAlquiler; track t) {
+                      <option [ngValue]="t">{{ t }}</option>
+                    }
+                  </select>
+                </label>
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn--secondary btn--block" [disabled]="!canActualizarPaquete()">Actualizar paquete</button>
+              </div>
+            </form>
+          </article>
+        }
+
+        @if (tab() === 'dormitorios') {
+          <article class="card">
+            <h2 class="card__title">Dormitorios</h2>
+            @if (maxDormitoriosPermitidos() !== null) {
+              <p class="cupo-banner">
+                Registrados <strong>{{ dormitorios().length }}</strong> de
+                <strong>{{ maxDormitoriosPermitidos() }}</strong> dormitorios (tope fijado al dar de alta la casa).
+              </p>
+              @if (cupoDormitoriosLleno()) {
+                <p class="alert alert--info" role="status">
+                  Cupo completo: no puedes registrar más dormitorios que los declarados en la ficha. Si el backend
+                  añade edición de la casa, podrás ajustar ese límite allí.
+                </p>
               }
-            </select>
-          </label>
-        </div>
-        <button type="submit" class="btn-primary" [disabled]="loading() || codigoActivo() == null">
-          Crear paquete
-        </button>
-      </form>
+            } @else if (!loading()) {
+              <p class="cupo-banner cupo-banner--muted">
+                Aún no tenemos el cupo de dormitorios de esta casa. Tras cargar el detalle desde el servidor se
+                mostrará «X de Y». Si intentas registrar y el servidor lo rechaza, el mensaje de error aparecerá
+                arriba.
+              </p>
+            }
+            @if (dormitorios().length) {
+              <div class="data-grid data-grid--dorms" role="list">
+                @for (d of dormitorios(); track d.idDormitorio) {
+                  <article class="data-card data-card--dorm" role="listitem">
+                    <h3 class="data-card__name">{{ d.nombre }}</h3>
+                    <dl class="data-card__meta">
+                      <div>
+                        <dt>Camas</dt>
+                        <dd>{{ d.numeroCamas }}</dd>
+                      </div>
+                      <div>
+                        <dt>Tipo</dt>
+                        <dd>{{ etiquetaTipoCama(d.tipoCama) }}</dd>
+                      </div>
+                      <div>
+                        <dt>Baño</dt>
+                        <dd>
+                          <span class="pill" [class.pill--on]="d.tieneBano" [class.pill--off]="!d.tieneBano">
+                            {{ d.tieneBano ? 'Sí' : 'No' }}
+                          </span>
+                        </dd>
+                      </div>
+                    </dl>
+                  </article>
+                }
+              </div>
+            } @else {
+              <p class="muted-block">Sin dormitorios registrados.</p>
+            }
+            <form [formGroup]="dormForm" (ngSubmit)="registrarDormitorio()" class="card__form-block">
+              <div class="form-grid">
+                <label class="form-field">
+                  <span class="form-label">Nombre</span>
+                  <input
+                    type="text"
+                    formControlName="nombre"
+                    placeholder="Ej. Principal"
+                    [class.input--invalid]="fieldStateDorm('nombre') === 'invalid'"
+                    [class.input--valid]="fieldStateDorm('nombre') === 'valid'"
+                  />
+                  @if (dormForm.get('nombre')?.invalid && (dormForm.get('nombre')?.dirty || dormForm.get('nombre')?.touched)) {
+                    <span class="form-error" role="alert">Nombre obligatorio.</span>
+                  }
+                </label>
+                <label class="form-field">
+                  <span class="form-label">Número de camas</span>
+                  <input
+                    type="number"
+                    min="1"
+                    formControlName="numeroCamas"
+                    [class.input--invalid]="fieldStateDorm('numeroCamas') === 'invalid'"
+                    [class.input--valid]="fieldStateDorm('numeroCamas') === 'valid'"
+                  />
+                  @if (dormForm.get('numeroCamas')?.invalid && (dormForm.get('numeroCamas')?.dirty || dormForm.get('numeroCamas')?.touched)) {
+                    <span class="form-error" role="alert">Mínimo 1 cama.</span>
+                  }
+                </label>
+                <label class="form-field">
+                  <span class="form-label">Tipo de cama</span>
+                  <select
+                    formControlName="tipoCama"
+                    [class.input--invalid]="fieldStateDorm('tipoCama') === 'invalid'"
+                    [class.input--valid]="fieldStateDorm('tipoCama') === 'valid'"
+                  >
+                    @for (o of opcionesCama; track o.value) {
+                      <option [ngValue]="o.value">{{ o.label }}</option>
+                    }
+                  </select>
+                </label>
+                <label class="form-field form-field--switch">
+                  <span class="form-label">Tiene baño</span>
+                  <input type="checkbox" formControlName="tieneBano" class="input-switch" />
+                </label>
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn--primary btn--block" [disabled]="!canRegistrarDormitorio()">
+                  Registrar dormitorio
+                </button>
+              </div>
+            </form>
+          </article>
+        }
 
-      <h3>Actualizar paquete</h3>
-      <form [formGroup]="paqueteEditForm" (ngSubmit)="actualizarPaquete()">
-        <div class="grid2">
-          <label>
-            <span>Id paquete</span>
-            <input type="number" min="1" formControlName="idPaquete" />
-          </label>
-          <label>
-            <span>Inicio</span>
-            <input type="date" formControlName="fechaInicio" />
-          </label>
-          <label>
-            <span>Fin</span>
-            <input type="date" formControlName="fechaFin" />
-          </label>
-          <label>
-            <span>Precio</span>
-            <input type="number" step="0.01" formControlName="precio" />
-          </label>
-          <label class="span2">
-            <span>Tipo</span>
-            <select formControlName="tipoAlquiler">
-              @for (t of tiposAlquiler; track t) {
-                <option [ngValue]="t">{{ t }}</option>
+        @if (tab() === 'cocinas') {
+          <article class="card">
+            <h2 class="card__title">Cocinas</h2>
+            @if (maxCocinasPermitidas() !== null) {
+              <p class="cupo-banner">
+                Registradas <strong>{{ cocinas().length }}</strong> de
+                <strong>{{ maxCocinasPermitidas() }}</strong> cocinas (tope fijado al dar de alta la casa).
+              </p>
+              @if (cupoCocinasLleno()) {
+                <p class="alert alert--info" role="status">
+                  Cupo completo: no puedes registrar más cocinas que las declaradas en la ficha.
+                </p>
               }
-            </select>
-          </label>
-        </div>
-        <button type="submit" class="btn-secondary" [disabled]="loading()">Actualizar</button>
-      </form>
-    </section>
-  }
+            } @else if (!loading()) {
+              <p class="cupo-banner cupo-banner--muted">
+                Aún no tenemos el cupo de cocinas de esta casa. Cuando el detalle esté disponible, verás «X de Y».
+              </p>
+            }
+            @if (cocinas().length) {
+              <div class="data-grid data-grid--cocinas" role="list">
+                @for (c of cocinas(); track c.idCocina) {
+                  <article class="data-card data-card--cocina" role="listitem">
+                    <div class="data-card__head">
+                      <span class="data-card__badge">Cocina #{{ c.idCocina }}</span>
+                    </div>
+                    <ul class="data-card__amenities">
+                      <li>
+                        <span class="amenity-label">Lavavajillas</span>
+                        <span class="pill" [class.pill--on]="c.tieneLavavajillas" [class.pill--off]="!c.tieneLavavajillas">
+                          {{ c.tieneLavavajillas ? 'Sí' : 'No' }}
+                        </span>
+                      </li>
+                      <li>
+                        <span class="amenity-label">Lavadora</span>
+                        <span class="pill" [class.pill--on]="c.tieneLavadora" [class.pill--off]="!c.tieneLavadora">
+                          {{ c.tieneLavadora ? 'Sí' : 'No' }}
+                        </span>
+                      </li>
+                    </ul>
+                  </article>
+                }
+              </div>
+            } @else {
+              <p class="muted-block">Sin cocinas registradas.</p>
+            }
+            <form [formGroup]="cocinaForm" (ngSubmit)="registrarCocina()" class="card__form-block">
+              <div class="form-grid form-grid--checks">
+                <label class="form-field form-field--check">
+                  <input type="checkbox" formControlName="tieneLavavajillas" />
+                  <span>Lavavajillas</span>
+                </label>
+                <label class="form-field form-field--check">
+                  <input type="checkbox" formControlName="tieneLavadora" />
+                  <span>Lavadora</span>
+                </label>
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn--primary btn--block" [disabled]="!canRegistrarCocina()">Registrar cocina</button>
+              </div>
+            </form>
+          </article>
+        }
+      </main>
 
-  @if (tab() === 'dormitorios') {
-    <section class="panel">
-      <h2>Dormitorios</h2>
-      @if (dormitorios().length) {
-        <ul class="list-compact">
-          @for (d of dormitorios(); track d.idDormitorio) {
-            <li>
-              #{{ d.idDormitorio }} — {{ d.nombre }} · {{ d.tipoCama }} · {{ d.numeroCamas }} cama(s) · baño:
-              {{ d.tieneBano ? 'sí' : 'no' }}
-            </li>
+      <aside class="prop-aside" aria-label="Resumen">
+        <div class="aside-card">
+          <h3 class="aside-card__title">Resumen rápido</h3>
+          @if (codigoActivo() != null) {
+            <dl class="aside-dl">
+              <div>
+                <dt>Paquetes</dt>
+                <dd>{{ paquetes().length }}</dd>
+              </div>
+              <div>
+                <dt>Dormitorios</dt>
+                <dd>
+                  @if (maxDormitoriosPermitidos() !== null) {
+                    {{ dormitorios().length }} / {{ maxDormitoriosPermitidos() }}
+                  } @else {
+                    {{ dormitorios().length }}
+                  }
+                </dd>
+              </div>
+              <div>
+                <dt>Cocinas</dt>
+                <dd>
+                  @if (maxCocinasPermitidas() !== null) {
+                    {{ cocinas().length }} / {{ maxCocinasPermitidas() }}
+                  } @else {
+                    {{ cocinas().length }}
+                  }
+                </dd>
+              </div>
+            </dl>
+            <p class="aside-card__hint">Los datos se actualizan al elegir una casa o tras guardar cambios.</p>
+          } @else {
+            <p class="aside-card__empty">Selecciona una casa para ver el resumen.</p>
           }
-        </ul>
-      } @else {
-        <p class="muted">Sin dormitorios registrados.</p>
-      }
-      <form [formGroup]="dormForm" (ngSubmit)="registrarDormitorio()">
-        <div class="grid2">
-          <label>
-            <span>Nombre</span>
-            <input type="text" formControlName="nombre" />
-          </label>
-          <label>
-            <span>Nº camas</span>
-            <input type="number" min="1" formControlName="numeroCamas" />
-          </label>
-          <label>
-            <span>Tipo cama</span>
-            <select formControlName="tipoCama">
-              @for (tc of tiposCama; track tc) {
-                <option [ngValue]="tc">{{ tc }}</option>
-              }
-            </select>
-          </label>
-          <label class="chk-inline">
-            <input type="checkbox" formControlName="tieneBano" />
-            <span>Tiene baño</span>
-          </label>
         </div>
-        <button type="submit" class="btn-primary" [disabled]="loading() || codigoActivo() == null">
-          Registrar dormitorio
-        </button>
-      </form>
-    </section>
-  }
-
-  @if (tab() === 'cocinas') {
-    <section class="panel">
-      <h2>Cocinas</h2>
-      @if (cocinas().length) {
-        <ul class="list-compact">
-          @for (c of cocinas(); track c.idCocina) {
-            <li>Lavavajillas: {{ c.tieneLavavajillas ? 'sí' : 'no' }} · Lavadora: {{ c.tieneLavadora ? 'sí' : 'no' }}</li>
-          }
-        </ul>
-      } @else {
-        <p class="muted">Sin cocinas registradas.</p>
-      }
-      <form [formGroup]="cocinaForm" (ngSubmit)="registrarCocina()">
-        <label class="chk-inline">
-          <input type="checkbox" formControlName="tieneLavavajillas" />
-          <span>Lavavajillas</span>
-        </label>
-        <label class="chk-inline">
-          <input type="checkbox" formControlName="tieneLavadora" />
-          <span>Lavadora</span>
-        </label>
-        <button type="submit" class="btn-primary" [disabled]="loading() || codigoActivo() == null">
-          Registrar cocina
-        </button>
-      </form>
-    </section>
-  }
-
-  <p class="footer-nav">
-    <a routerLink="/login">Ir al login</a>
-  </p>
+      </aside>
+    </div>
+  </div>
 </div>

@@ -14,6 +14,7 @@ import { ReservaService } from '../../Services/reserva.service';
 import { DormitorioService } from '../../Services/dormitorio.service';
 import { CasaRuralService } from '../../Services/casarural.service';
 import { readApiError } from '../../core/http-error.util';
+import { resolveFotoSrc } from '../../core/foto-url.util';
 import { CasaRuralResponse } from '../../DTO/CasaRural-response';
 import { MetodoPago } from '../../DTO/pago-request';
 import { PaqueteAlquilerResponse } from '../../DTO/paquete-response';
@@ -162,13 +163,9 @@ export class ClienteDashboardComponent {
     });
   }
 
-  /** Solo http(s) para evitar javascript: en src de imagen. */
+  /** Resuelve /uploads/... y URLs absolutas para &lt;img&gt; (mismo criterio que el panel propietario). */
   protected urlFotoSegura(url: string | undefined | null): string | null {
-    const u = (url ?? '').trim();
-    if (!u) return null;
-    const l = u.toLowerCase();
-    if (l.startsWith('https://') || l.startsWith('http://')) return u;
-    return null;
+    return resolveFotoSrc(url);
   }
 
   protected toggleDorm(id: number) {

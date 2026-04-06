@@ -1,24 +1,24 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
+import { normalizeCasaRuralResponse } from '../core/foto-url.util';
 
-import { CasaRuralRequest } from '../DTO/CasaRural-request';
+import { CasaRuralRequestDTO } from '../DTO/CasaRural-request';
 import { CasaRuralResponse } from '../DTO/CasaRural-response';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class CasaRuralService {
   private apiUrl = `${environment.apiUrl}/casa_rural`;
 
   constructor(private http: HttpClient) {}
 
-  registrarCasa(data: CasaRuralRequest): Observable<CasaRuralResponse> {
-  
+  registrarCasa(data: CasaRuralRequestDTO): Observable<CasaRuralResponse> {
     const formData = new FormData();
-    
-    // Añadir campos simples
+
     formData.append('poblacion', data.poblacion);
     formData.append('descripcion', data.descripcion);
     formData.append('numeroDormitorios', data.numeroDormitorios.toString());
@@ -26,13 +26,24 @@ export class CasaRuralService {
     formData.append('numeroCocinas', data.numeroCocinas.toString());
     formData.append('numeroComedores', data.numeroComedores.toString());
     formData.append('plazasGaraje', data.plazasGaraje.toString());
-    
-    // Añadir fotos y descripciones
-    data.fotos.forEach((foto, index) => {
+
+    data.fotos.forEach((foto: File, index: number) => {
       formData.append('fotos', foto);
       formData.append('descripcionesFotos', data.descripcionesFotos[index]);
     });
-    
-    return this.http.post<CasaRuralResponse>(`${this.apiUrl}/registrar`, formData);
+
+    return this.http
+      .post<unknown>(`${this.apiUrl}/registrar`, formData)
+      .pipe(map((raw) => normalizeCasaRuralResponse(raw)));
+  }
+
+  /**
+   * Detalle de casa por código (fotos, descripción, etc.).
+   * Ajusta la ruta si tu controlador usa otro mapping.
+   */
+  obtenerCasaPorCodigo(codigoCasa: number): Observable<CasaRuralResponse> {
+    return this.http
+      .get<unknown>(`${this.apiUrl}/${codigoCasa}`)
+      .pipe(map((raw) => normalizeCasaRuralResponse(raw)));
   }
 }
