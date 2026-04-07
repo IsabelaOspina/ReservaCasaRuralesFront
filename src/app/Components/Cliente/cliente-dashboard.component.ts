@@ -3,6 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
 import { catchError, forkJoin, of } from 'rxjs';
 import {
+  AbstractControl,
   FormBuilder,
   ReactiveFormsModule,
   Validators,
@@ -25,9 +26,20 @@ import {
   PagoInfoResponse,
   transformPagoInfoResponse,
 } from '../../DTO/pagoinfo-response';
+import { TipoAlquiler } from '../../DTO/paquete-request';
 
 const LS_CODIGO = 'cliente_codigo_casa';
 const SS_RESERVA = 'cliente_ultima_reserva';
+const LS_CATALOGO = 'cliente_catalogo_casas';
+const LS_PROPIETARIO_CASAS = 'propietario_casas';
+
+/** Casas que el cliente ha cargado al menos una vez (sin API de listado global). */
+export interface CasaClienteCatalogo {
+  codigoCasa: number;
+  poblacion: string;
+  descripcion?: string;
+  previewUrl?: string;
+}
 
 @Component({
   selector: 'app-cliente-dashboard',
@@ -46,8 +58,10 @@ export class ClienteDashboardComponent {
   private readonly router = inject(Router);
 
   protected readonly codigoCasa = signal<number | null>(null);
-  /** Detalle de la casa (fotos, descripción); null si el backend no expone GET por código. */
   protected readonly casaDetalle = signal<CasaRuralResponse | null>(null);
+  /** Casas mostradas en «Nuestras casas»: API + catálogo cliente + casas del panel propietario (mismo navegador). */
+  protected readonly casasListado = signal<CasaClienteCatalogo[]>([]);
+  protected readonly loadingListadoCasas = signal(false);
   protected readonly paquetes = signal<PaqueteAlquilerResponse[]>([]);
   protected readonly dormitorios = signal<DormitorioResponse[]>([]);
   protected readonly selectedDormIds = signal<number[]>([]);
@@ -70,6 +84,14 @@ export class ClienteDashboardComponent {
   protected readonly error = signal<string | null>(null);
   protected readonly success = signal<string | null>(null);
 
+  protected readonly modalGaleriaAbierta = signal(false);
+  /** Detalle cargado solo para el modal (p. ej. otra casa de la tira sin ser la activa). */
+  protected readonly galeriaCasa = signal<CasaRuralResponse | null>(null);
+  protected readonly loadingGaleriaCasa = signal(false);
+  protected readonly navActiva = signal<
+    'flujo' | 'reservas' | 'disponibilidad' | 'pagos'
+  >('flujo');
+
   protected readonly codigoForm = this.fb.nonNullable.group({
     codigo: [1, [Validators.required, Validators.min(1)]],
   });
@@ -79,11 +101,15 @@ export class ClienteDashboardComponent {
     noches: [3, [Validators.required, Validators.min(1)]],
   });
 
+  private readonly telefonoOpcional = [
+    Validators.pattern(/^$|^\+?[0-9\s\-]{7,20}$/),
+  ];
+
   protected readonly reservaForm = this.fb.nonNullable.group({
     fechaInicio: ['', Validators.required],
     noches: [3, [Validators.required, Validators.min(1)]],
     paqueteId: [0, [Validators.required, Validators.min(1)]],
-    telefonoContacto: [''],
+    telefonoContacto: ['', this.telefonoOpcional],
   });
 
   protected readonly pagoForm = this.fb.nonNullable.group({
@@ -101,6 +127,7 @@ export class ClienteDashboardComponent {
   ];
 
   constructor() {
+    this.refrescarListadoCompleto();
     const saved = localStorage.getItem(LS_CODIGO);
     if (saved) {
       const n = parseInt(saved, 10);
@@ -122,6 +149,321 @@ export class ClienteDashboardComponent {
     }
     const hoy = new Date().toISOString().slice(0, 10);
     this.pagoForm.patchValue({ fechaPago: hoy });
+
+    this.dispForm.valueChanges.subscribe(() => {
+      const d = this.dispForm.getRawValue();
+      this.reservaForm.patchValue(
+        {
+          fechaInicio: d.fechaInicio,
+          noches: d.noches,
+        },
+        { emitEvent: false }
+      );
+    });
+  }
+
+  private readCatalogo(): CasaClienteCatalogo[] {
+    try {
+      const raw = localStorage.getItem(LS_CATALOGO);
+      return raw ? (JSON.parse(raw) as CasaClienteCatalogo[]) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private persistCatalogo(list: CasaClienteCatalogo[]) {
+    localStorage.setItem(LS_CATALOGO, JSON.stringify(list));
+  }
+
+  private upsertCatalogo(entry: CasaClienteCatalogo) {
+    const list = [...this.readCatalogo()];
+    const i = list.findIndex((x) => x.codigoCasa === entry.codigoCasa);
+    if (i >= 0) list[i] = { ...list[i], ...entry };
+    else list.push(entry);
+    this.persistCatalogo(list);
+    this.refrescarListadoCompleto();
+  }
+
+  private readPropietarioCasasLs(): CasaClienteCatalogo[] {
+    try {
+      const raw = localStorage.getItem(LS_PROPIETARIO_CASAS);
+      if (!raw) return [];
+      const arr = JSON.parse(raw) as {
+        codigoCasa: number;
+        poblacion: string;
+        descripcion?: string;
+      }[];
+      if (!Array.isArray(arr)) return [];
+      return arr.map((x) => ({
+        codigoCasa: x.codigoCasa,
+        poblacion: (x.poblacion ?? '').trim() || `Casa ${x.codigoCasa}`,
+        descripcion: x.descripcion,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  private mergeCasasFuente(api: CasaRuralResponse[]): CasaClienteCatalogo[] {
+    const map = new Map<number, CasaClienteCatalogo>();
+    const add = (c: CasaClienteCatalogo) => {
+      const prev = map.get(c.codigoCasa);
+      if (!prev) {
+        map.set(c.codigoCasa, { ...c });
+        return;
+      }
+      const pv = (c.previewUrl ?? '').trim();
+      const prevPv = (prev.previewUrl ?? '').trim();
+      map.set(c.codigoCasa, {
+        codigoCasa: c.codigoCasa,
+        poblacion: (c.poblacion ?? '').trim() || prev.poblacion,
+        descripcion: c.descripcion ?? prev.descripcion,
+        previewUrl: pv || prevPv || undefined,
+      });
+    };
+    for (const r of api) {
+      if (!r?.codigoCasa) continue;
+      add({
+        codigoCasa: r.codigoCasa,
+        poblacion: r.poblacion?.trim() || `Casa ${r.codigoCasa}`,
+        descripcion: r.descripcion,
+        previewUrl: r.fotos?.[0]?.url,
+      });
+    }
+    for (const c of this.readCatalogo()) add(c);
+    for (const c of this.readPropietarioCasasLs()) add(c);
+    return Array.from(map.values()).sort((a, b) => a.codigoCasa - b.codigoCasa);
+  }
+
+  private refrescarListadoCompleto() {
+    this.loadingListadoCasas.set(true);
+    this.casaRuralService.listarCasasDisponibles().subscribe({
+      next: (api) => {
+        const merged = this.mergeCasasFuente(api);
+        this.casasListado.set(merged);
+        this.loadingListadoCasas.set(false);
+        this.enriquecerPreviewsFaltantes(merged);
+      },
+      error: () => {
+        this.loadingListadoCasas.set(false);
+        this.casasListado.set(this.mergeCasasFuente([]));
+      },
+    });
+  }
+
+  /** Si el listado no trae fotos, pide el detalle por código (máx. 20) para rellenar miniatura. */
+  private enriquecerPreviewsFaltantes(list: CasaClienteCatalogo[]) {
+    const sin = list.filter((x) => !(x.previewUrl ?? '').trim()).slice(0, 20);
+    if (sin.length === 0) return;
+    forkJoin(
+      sin.map((c) =>
+        this.casaRuralService.obtenerCasaPorCodigo(c.codigoCasa).pipe(
+          catchError(() => of(null))
+        )
+      )
+    ).subscribe((detalles) => {
+      const mapa = new Map(list.map((x) => [x.codigoCasa, { ...x }]));
+      detalles.forEach((det, i) => {
+        const c = sin[i];
+        const url = det?.fotos?.[0]?.url;
+        if (url && c) {
+          const cur = mapa.get(c.codigoCasa);
+          if (cur && !(cur.previewUrl ?? '').trim()) {
+            cur.previewUrl = url;
+            mapa.set(c.codigoCasa, cur);
+          }
+        }
+      });
+      this.casasListado.set(
+        Array.from(mapa.values()).sort((a, b) => a.codigoCasa - b.codigoCasa)
+      );
+    });
+  }
+
+  protected idPublicoCasa(codigo: number): string {
+    return `RUR-${String(codigo).padStart(3, '0')}`;
+  }
+
+  protected nombreCasaMostrar(): string {
+    const d = this.casaDetalle();
+    if (d?.poblacion?.trim()) return d.poblacion.trim();
+    const c = this.codigoCasa();
+    return c != null ? `Casa ${c}` : '';
+  }
+
+  protected hayDatosCasaCargados(): boolean {
+    return this.codigoCasa() != null && !this.loadingPaquetes();
+  }
+
+  protected seleccionarCasaCatalogo(c: CasaClienteCatalogo) {
+    this.codigoForm.patchValue({ codigo: c.codigoCasa });
+    this.cargarDatosCasa(c.codigoCasa);
+  }
+
+  protected irNav(dest: 'flujo' | 'reservas' | 'disponibilidad' | 'pagos') {
+    this.navActiva.set(dest);
+    const map: Record<typeof dest, string> = {
+      flujo: 'sec-casas',
+      reservas: 'sec-reserva',
+      disponibilidad: 'sec-disponibilidad',
+      pagos: 'sec-pagos',
+    };
+    const id = map[dest];
+    queueMicrotask(() =>
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    );
+  }
+
+  protected casaGaleriaModal(): CasaRuralResponse | null {
+    return this.galeriaCasa() ?? this.casaDetalle();
+  }
+
+  protected tituloGaleria(): string {
+    const g = this.galeriaCasa();
+    if (g?.poblacion?.trim()) return g.poblacion.trim();
+    return this.nombreCasaMostrar();
+  }
+
+  protected abrirGaleria() {
+    this.galeriaCasa.set(null);
+    if ((this.casaDetalle()?.fotos?.length ?? 0) > 0) {
+      this.modalGaleriaAbierta.set(true);
+    }
+  }
+
+  /**
+   * Construye un detalle mínimo solo con la URL de vista previa guardada en catálogo (mismo navegador).
+   * Sirve mientras no exista GET /casa_rural/{codigo} en el servidor.
+   */
+  private casaDesdeCatalogoSoloPreview(c: CasaClienteCatalogo): CasaRuralResponse | null {
+    const url = (c.previewUrl ?? '').trim();
+    if (!url) return null;
+    return {
+      codigoCasa: c.codigoCasa,
+      poblacion: c.poblacion,
+      descripcion: c.descripcion ?? '',
+      numeroDormitorios: 0,
+      numeroBanos: 0,
+      numeroCocinas: 0,
+      numeroComedores: 0,
+      plazasGaraje: 0,
+      fotos: [
+        {
+          idFoto: 0,
+          url,
+          descripcion: 'Vista previa (datos en este navegador)',
+        },
+      ],
+    };
+  }
+
+  /**
+   * Galería desde tarjeta: detalle en memoria → GET (cuando exista) → miniatura del catálogo local.
+   */
+  protected abrirGaleriaCasa(c: CasaClienteCatalogo) {
+    this.error.set(null);
+    const detalle = this.casaDetalle();
+    if (
+      this.codigoCasa() === c.codigoCasa &&
+      detalle &&
+      detalle.codigoCasa === c.codigoCasa &&
+      (detalle.fotos?.length ?? 0) > 0
+    ) {
+      this.galeriaCasa.set(null);
+      this.modalGaleriaAbierta.set(true);
+      return;
+    }
+
+    const desdeCatalogo = this.casaDesdeCatalogoSoloPreview(c);
+
+    this.loadingGaleriaCasa.set(true);
+    this.casaRuralService.obtenerCasaPorCodigo(c.codigoCasa).subscribe({
+      next: (casa) => {
+        this.loadingGaleriaCasa.set(false);
+        if (casa && (casa.fotos?.length ?? 0) > 0) {
+          this.galeriaCasa.set(casa);
+          this.modalGaleriaAbierta.set(true);
+          return;
+        }
+        if (desdeCatalogo) {
+          this.galeriaCasa.set(desdeCatalogo);
+          this.modalGaleriaAbierta.set(true);
+          return;
+        }
+        this.error.set(
+          'No hay fotos para esta casa. Tras registrar la casa con archivos, vuelve a cargarla por código para guardar la vista previa, o espera a que el backend publique GET de detalle por código.'
+        );
+      },
+      error: () => {
+        this.loadingGaleriaCasa.set(false);
+        if (desdeCatalogo) {
+          this.galeriaCasa.set(desdeCatalogo);
+          this.modalGaleriaAbierta.set(true);
+          return;
+        }
+        this.error.set(
+          'El backend aún no publica GET de detalle por código (404 es esperable). Para ver fotos, carga la casa con «Cargar / actualizar» tras un registro con imágenes, o cuando exista ese GET en el servidor.'
+        );
+      },
+    });
+  }
+
+  protected cerrarGaleria() {
+    this.modalGaleriaAbierta.set(false);
+    this.galeriaCasa.set(null);
+  }
+
+  protected etiquetaPaquete(p: PaqueteAlquilerResponse): string {
+    const tipo =
+      p.tipoAlquiler === TipoAlquiler.CASA_COMPLETA
+        ? 'Casa completa'
+        : p.tipoAlquiler === TipoAlquiler.POR_HABITACIONES
+          ? 'Por habitaciones'
+          : 'Casa y habitaciones';
+    return `${tipo} · ${p.fechaInicio} → ${p.fechaFin}`;
+  }
+
+  protected nombrePaqueteCorto(p: PaqueteAlquilerResponse): string {
+    return `Paquete #${p.idPaquete}`;
+  }
+
+  protected seleccionarPaquete(id: number) {
+    this.reservaForm.patchValue({ paqueteId: id });
+  }
+
+  protected urlFotoSegura(url: string | undefined | null): string | null {
+    return resolveFotoSrc(url);
+  }
+
+  protected fieldState(
+    form: 'disp' | 'reserva' | 'pago',
+    name: string
+  ): '' | 'invalid' | 'valid' {
+    let ctrl: AbstractControl | null = null;
+    if (form === 'disp') ctrl = this.dispForm.get(name);
+    else if (form === 'reserva') ctrl = this.reservaForm.get(name);
+    else ctrl = this.pagoForm.get(name);
+    if (!ctrl) return '';
+    if (!(ctrl.dirty || ctrl.touched)) return '';
+    return ctrl.invalid ? 'invalid' : 'valid';
+  }
+
+  protected canCrearReserva(): boolean {
+    if (this.loadingReserva()) return false;
+    if (this.codigoCasa() == null) return false;
+    if (this.paquetes().length === 0) return false;
+    return this.reservaForm.valid;
+  }
+
+  protected canRegistrarPago(): boolean {
+    if (this.loadingPagos()) return false;
+    return this.pagoForm.valid;
+  }
+
+  protected canComprobarDisponibilidad(): boolean {
+    if (this.loadingDisp()) return false;
+    if (this.codigoCasa() == null) return false;
+    return this.dispForm.valid;
   }
 
   protected cargarDatosCasa(raw?: number) {
@@ -154,18 +496,21 @@ export class ClienteDashboardComponent {
         this.selectedDormIds.set([]);
         this.casaDetalle.set(casa);
         this.loadingPaquetes.set(false);
-        this.success.set(`Datos cargados para casa ${v}`);
+        const nombre =
+          casa?.poblacion?.trim() ?? `Casa ${v}`;
+        this.upsertCatalogo({
+          codigoCasa: v,
+          poblacion: nombre,
+          descripcion: casa?.descripcion,
+          previewUrl: casa?.fotos?.[0]?.url,
+        });
+        this.success.set(`Datos cargados para ${nombre}`);
       },
       error: (err: HttpErrorResponse) => {
         this.loadingPaquetes.set(false);
         this.error.set(readApiError(err));
       },
     });
-  }
-
-  /** Resuelve /uploads/... y URLs absolutas para &lt;img&gt; (mismo criterio que el panel propietario). */
-  protected urlFotoSegura(url: string | undefined | null): string | null {
-    return resolveFotoSrc(url);
   }
 
   protected toggleDorm(id: number) {
@@ -182,7 +527,7 @@ export class ClienteDashboardComponent {
     this.clearMessages();
     const casa = this.codigoCasa();
     if (casa == null) {
-      this.error.set('Primero carga el código de casa');
+      this.error.set('Selecciona o carga una casa primero');
       return;
     }
     if (this.dispForm.invalid) {
@@ -192,9 +537,14 @@ export class ClienteDashboardComponent {
     this.loadingDisp.set(true);
     this.disponibilidadResult.set(null);
     const d = this.dispForm.getRawValue();
+    const paqueteId =
+      Number(this.reservaForm.getRawValue().paqueteId) > 0
+        ? Number(this.reservaForm.getRawValue().paqueteId)
+        : 0;
     this.reservaService
       .verificarDisponibilidad({
         casaId: casa,
+        paqueteId,
         fechaInicio: d.fechaInicio,
         noches: d.noches,
       })
@@ -217,7 +567,7 @@ export class ClienteDashboardComponent {
     this.clearMessages();
     const casa = this.codigoCasa();
     if (casa == null) {
-      this.error.set('Primero carga el código de casa');
+      this.error.set('Selecciona una casa primero');
       return;
     }
     if (this.reservaForm.invalid) {
@@ -250,7 +600,9 @@ export class ClienteDashboardComponent {
         this.ultimaReserva.set(res);
         sessionStorage.setItem(SS_RESERVA, JSON.stringify(res));
         this.pagoForm.patchValue({ reservaId: res.id });
-        this.success.set(`Reserva creada (id ${res.id}). Fecha límite pago: ${res.fechaLimitePago}`);
+        this.success.set(
+          `Reserva creada con ID ${res.id}. Fecha límite de pago: ${res.fechaLimitePago}`
+        );
       },
       error: (err: HttpErrorResponse) => {
         this.loadingReserva.set(false);
@@ -314,7 +666,7 @@ export class ClienteDashboardComponent {
       .subscribe({
         next: () => {
           this.loadingPagos.set(false);
-          this.success.set('Pago registrado');
+          this.success.set('Pago registrado correctamente');
           this.listarPagosReserva();
           this.cargarInfoPago();
         },
