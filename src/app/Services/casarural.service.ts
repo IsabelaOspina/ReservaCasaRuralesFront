@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { Observable, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import { normalizeCasaRuralResponse } from '../core/foto-url.util';
 
@@ -45,5 +45,34 @@ export class CasaRuralService {
     return this.http
       .get<unknown>(`${this.apiUrl}/${codigoCasa}`)
       .pipe(map((raw) => normalizeCasaRuralResponse(raw)));
+  }
+
+  /**
+   * Listado público de casas (ajusta la ruta si tu controlador usa otro mapping).
+   * Ej. GET /casa_rural/listar
+   */
+  listarCasasDisponibles(): Observable<CasaRuralResponse[]> {
+    return this.http.get<unknown>(`${this.apiUrl}/listar`).pipe(
+      map((raw) => this.parseListadoCasas(raw)),
+      catchError(() => of([]))
+    );
+  }
+
+  private parseListadoCasas(raw: unknown): CasaRuralResponse[] {
+    if (Array.isArray(raw)) {
+      return raw.map((x) => normalizeCasaRuralResponse(x));
+    }
+    if (raw && typeof raw === 'object') {
+      const o = raw as Record<string, unknown>;
+      const inner =
+        o['content'] ??
+        o['data'] ??
+        o['casas'] ??
+        (o['_embedded'] as Record<string, unknown> | undefined)?.['casaRurals'];
+      if (Array.isArray(inner)) {
+        return inner.map((x) => normalizeCasaRuralResponse(x));
+      }
+    }
+    return [];
   }
 }
