@@ -16,6 +16,7 @@ export class CasaRuralService {
 
   constructor(private http: HttpClient) {}
 
+  // HU003 - Registrar una nueva casa rural
   registrarCasa(data: CasaRuralRequestDTO): Observable<CasaRuralResponse> {
     const formData = new FormData();
 
@@ -37,12 +38,21 @@ export class CasaRuralService {
       .pipe(map((raw) => normalizeCasaRuralResponse(raw)));
   }
 
-  /**
-   * Detalle de casa por código (fotos, descripción, etc.).
-   */
+  // Obtener una casa rural por su código
   obtenerCasaPorCodigo(codigoCasa: number): Observable<CasaRuralResponse> {
     return this.http
       .get<unknown>(`${this.apiUrl}/${codigoCasa}`)
       .pipe(map((raw) => normalizeCasaRuralResponse(raw)));
+  }
+
+  // Listar todas las casas rurales
+  listarCasas(): Observable<CasaRuralResponse[]> {
+    return this.http
+      .get<unknown[]>(`${this.apiUrl}/listar`)
+      .pipe(
+        map((rawList) => 
+          rawList.map((raw) => normalizeCasaRuralResponse(raw))
+        )
+      );
   }
 }
