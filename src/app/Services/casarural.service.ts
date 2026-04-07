@@ -39,7 +39,6 @@ export class CasaRuralService {
 
   /**
    * Detalle de casa por código (fotos, descripción, etc.).
-   * Ajusta la ruta si tu controlador usa otro mapping.
    */
   obtenerCasaPorCodigo(codigoCasa: number): Observable<CasaRuralResponse> {
     return this.http
