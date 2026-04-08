@@ -5,6 +5,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { UsuarioService } from '../../Services/usuario.service';
 import { resolvePostLoginRoute } from '../../core/auth/jwt.util';
+import { readApiError } from '../../core/http-error.util';
 import { LoginRequest } from '../../DTO/login-request';
 
 const LS_EMAIL = 'login_remember_email';
@@ -90,20 +91,7 @@ export class LoginComponent implements OnInit {
         }
       },
       error: (err: HttpErrorResponse) => {
-        const body = err.error;
-        const fromApi =
-          typeof body === 'object' &&
-          body !== null &&
-          'error' in body &&
-          typeof (body as { error: unknown }).error === 'string'
-            ? (body as { error: string }).error
-            : null;
-        const msg =
-          fromApi ??
-          (typeof err.error === 'string' ? err.error : null) ??
-          err.message ??
-          'No se pudo iniciar sesión. Intenta de nuevo.';
-        this.serverError.set(msg);
+        this.serverError.set(readApiError(err));
         this.isSubmitting.set(false);
       },
     });

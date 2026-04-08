@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
-import { catchError, forkJoin, of } from 'rxjs';
+import { forkJoin } from 'rxjs';
 import {
   AbstractControl,
   FormBuilder,
@@ -22,6 +22,7 @@ import { PaqueteAlquilerResponse } from '../../DTO/paquete-response';
 import { DormitorioResponse } from '../../DTO/Dormitorio-response';
 import { ReservaResponse } from '../../DTO/reserva-response';
 import { PagoResponse } from '../../DTO/pago-response';
+import { FotoResponse } from '../../DTO/Foto-response';
 import {
   PagoInfoResponse,
   transformPagoInfoResponse,
@@ -39,6 +40,7 @@ export interface CasaClienteCatalogo {
   poblacion: string;
   descripcion?: string;
   previewUrl?: string;
+  fotos?: FotoResponse[];
 }
 
 @Component({
@@ -192,12 +194,16 @@ export class ClienteDashboardComponent {
         codigoCasa: number;
         poblacion: string;
         descripcion?: string;
+        previewUrl?: string;
+        fotos?: FotoResponse[];
       }[];
       if (!Array.isArray(arr)) return [];
       return arr.map((x) => ({
         codigoCasa: x.codigoCasa,
         poblacion: (x.poblacion ?? '').trim() || `Casa ${x.codigoCasa}`,
         descripcion: x.descripcion,
+        previewUrl: x.previewUrl,
+        fotos: x.fotos,
       }));
     } catch {
       return [];
@@ -219,6 +225,7 @@ export class ClienteDashboardComponent {
         poblacion: (c.poblacion ?? '').trim() || prev.poblacion,
         descripcion: c.descripcion ?? prev.descripcion,
         previewUrl: pv || prevPv || undefined,
+        fotos: (c.fotos?.length ?? 0) > 0 ? c.fotos : prev.fotos,
       });
     };
     for (const r of api) {
@@ -228,6 +235,7 @@ export class ClienteDashboardComponent {
         poblacion: r.poblacion?.trim() || `Casa ${r.codigoCasa}`,
         descripcion: r.descripcion,
         previewUrl: r.fotos?.[0]?.url,
+        fotos: r.fotos,
       });
     }
     for (const c of this.readCatalogo()) add(c);
@@ -242,41 +250,11 @@ export class ClienteDashboardComponent {
         const merged = this.mergeCasasFuente(api);
         this.casasListado.set(merged);
         this.loadingListadoCasas.set(false);
-        this.enriquecerPreviewsFaltantes(merged);
       },
       error: () => {
         this.loadingListadoCasas.set(false);
         this.casasListado.set(this.mergeCasasFuente([]));
       },
-    });
-  }
-
-  /** Si el listado no trae fotos, pide el detalle por código (máx. 20) para rellenar miniatura. */
-  private enriquecerPreviewsFaltantes(list: CasaClienteCatalogo[]) {
-    const sin = list.filter((x) => !(x.previewUrl ?? '').trim()).slice(0, 20);
-    if (sin.length === 0) return;
-    forkJoin(
-      sin.map((c) =>
-        this.casaRuralService.obtenerCasaPorCodigo(c.codigoCasa).pipe(
-          catchError(() => of(null))
-        )
-      )
-    ).subscribe((detalles) => {
-      const mapa = new Map(list.map((x) => [x.codigoCasa, { ...x }]));
-      detalles.forEach((det, i) => {
-        const c = sin[i];
-        const url = det?.fotos?.[0]?.url;
-        if (url && c) {
-          const cur = mapa.get(c.codigoCasa);
-          if (cur && !(cur.previewUrl ?? '').trim()) {
-            cur.previewUrl = url;
-            mapa.set(c.codigoCasa, cur);
-          }
-        }
-      });
-      this.casasListado.set(
-        Array.from(mapa.values()).sort((a, b) => a.codigoCasa - b.codigoCasa)
-      );
     });
   }
 
@@ -336,8 +314,12 @@ export class ClienteDashboardComponent {
    * Sirve mientras no exista GET /casa_rural/{codigo} en el servidor.
    */
   private casaDesdeCatalogoSoloPreview(c: CasaClienteCatalogo): CasaRuralResponse | null {
-    const url = (c.previewUrl ?? '').trim();
-    if (!url) return null;
+    const fotos = (c.fotos?.length ?? 0) > 0
+      ? c.fotos!
+      : (c.previewUrl ?? '').trim()
+        ? [{ idFoto: 0, url: (c.previewUrl ?? '').trim(), descripcion: 'Vista previa (datos en este navegador)' }]
+        : [];
+    if (fotos.length === 0) return null;
     return {
       codigoCasa: c.codigoCasa,
       poblacion: c.poblacion,
@@ -347,13 +329,7 @@ export class ClienteDashboardComponent {
       numeroCocinas: 0,
       numeroComedores: 0,
       plazasGaraje: 0,
-      fotos: [
-        {
-          idFoto: 0,
-          url,
-          descripcion: 'Vista previa (datos en este navegador)',
-        },
-      ],
+      fotos,
     };
   }
 
@@ -376,36 +352,13 @@ export class ClienteDashboardComponent {
 
     const desdeCatalogo = this.casaDesdeCatalogoSoloPreview(c);
 
-    this.loadingGaleriaCasa.set(true);
-    this.casaRuralService.obtenerCasaPorCodigo(c.codigoCasa).subscribe({
-      next: (casa) => {
-        this.loadingGaleriaCasa.set(false);
-        if (casa && (casa.fotos?.length ?? 0) > 0) {
-          this.galeriaCasa.set(casa);
-          this.modalGaleriaAbierta.set(true);
-          return;
-        }
-        if (desdeCatalogo) {
-          this.galeriaCasa.set(desdeCatalogo);
-          this.modalGaleriaAbierta.set(true);
-          return;
-        }
-        this.error.set(
-          'No hay fotos para esta casa. Tras registrar la casa con archivos, vuelve a cargarla por código para guardar la vista previa, o espera a que el backend publique GET de detalle por código.'
-        );
-      },
-      error: () => {
-        this.loadingGaleriaCasa.set(false);
-        if (desdeCatalogo) {
-          this.galeriaCasa.set(desdeCatalogo);
-          this.modalGaleriaAbierta.set(true);
-          return;
-        }
-        this.error.set(
-          'El backend aún no publica GET de detalle por código (404 es esperable). Para ver fotos, carga la casa con «Cargar / actualizar» tras un registro con imágenes, o cuando exista ese GET en el servidor.'
-        );
-      },
-    });
+    // Backend confirmado: no existe GET /casa_rural/{codigo} actualmente.
+    if (desdeCatalogo) {
+      this.galeriaCasa.set(desdeCatalogo);
+      this.modalGaleriaAbierta.set(true);
+      return;
+    }
+    this.error.set('No hay fotos para esta casa en este dispositivo.');
   }
 
   protected cerrarGaleria() {
@@ -425,6 +378,15 @@ export class ClienteDashboardComponent {
 
   protected nombrePaqueteCorto(p: PaqueteAlquilerResponse): string {
     return `Paquete #${p.idPaquete}`;
+  }
+
+  protected etiquetaMetodoPago(m: MetodoPago): string {
+    const map: Record<MetodoPago, string> = {
+      [MetodoPago.TRANSFERENCIA]: 'Transferencia',
+      [MetodoPago.TARJETA]: 'Tarjeta',
+      [MetodoPago.EFECTIVO]: 'Efectivo',
+    };
+    return map[m] ?? String(m);
   }
 
   protected seleccionarPaquete(id: number) {
@@ -482,11 +444,8 @@ export class ClienteDashboardComponent {
     forkJoin({
       paquetes: this.paqueteService.listarPaquetesPorCasa(v),
       dormitorios: this.dormitorioService.listarDormitorios(v),
-      casa: this.casaRuralService.obtenerCasaPorCodigo(v).pipe(
-        catchError(() => of(null))
-      ),
     }).subscribe({
-      next: ({ paquetes, dormitorios, casa }) => {
+      next: ({ paquetes, dormitorios }) => {
         this.paquetes.set(paquetes);
         const first = paquetes[0]?.idPaquete;
         if (first) {
@@ -494,17 +453,19 @@ export class ClienteDashboardComponent {
         }
         this.dormitorios.set(dormitorios);
         this.selectedDormIds.set([]);
-        this.casaDetalle.set(casa);
         this.loadingPaquetes.set(false);
-        const nombre =
-          casa?.poblacion?.trim() ?? `Casa ${v}`;
+        const local = this.casasListado().find((x) => x.codigoCasa === v);
+        const casaLocal = local ? this.casaDesdeCatalogoSoloPreview(local) : null;
+        this.casaDetalle.set(casaLocal);
+        const nombre = casaLocal?.poblacion?.trim() ?? `Casa ${v}`;
         this.upsertCatalogo({
           codigoCasa: v,
           poblacion: nombre,
-          descripcion: casa?.descripcion,
-          previewUrl: casa?.fotos?.[0]?.url,
+          descripcion: casaLocal?.descripcion,
+          previewUrl: casaLocal?.fotos?.[0]?.url,
+          fotos: casaLocal?.fotos,
         });
-        this.success.set(`Datos cargados para ${nombre}`);
+        this.success.set(`Datos cargados para ${nombre}.`);
       },
       error: (err: HttpErrorResponse) => {
         this.loadingPaquetes.set(false);

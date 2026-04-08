@@ -1,8 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
-import { forkJoin, of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { forkJoin } from 'rxjs';
 import {
   AbstractControl,
   FormBuilder,
@@ -20,6 +19,7 @@ import { CocinaService } from '../../Services/cocina.service';
 import { readApiError } from '../../core/http-error.util';
 import { CasaRuralRequestDTO } from '../../DTO/CasaRural-request';
 import { CasaRuralResponse } from '../../DTO/CasaRural-response';
+import { FotoResponse } from '../../DTO/Foto-response';
 import { PaqueteAlquilerResponse } from '../../DTO/paquete-response';
 import { TipoAlquiler } from '../../DTO/paquete-request';
 import { DormitorioResponse } from '../../DTO/Dormitorio-response';
@@ -46,6 +46,9 @@ export interface CasaRegistradaLocal {
   numeroDormitorios?: number;
   /** Tope de registros POST cocina. */
   numeroCocinas?: number;
+  /** Miniatura/galería local (mientras no exista GET por código en backend). */
+  previewUrl?: string;
+  fotos?: FotoResponse[];
 }
 
 @Component({
@@ -283,10 +286,6 @@ export class PropietarioDashboardComponent {
     return true;
   }
 
-  protected irVistaPrevia(): void {
-    void this.router.navigate(['/cliente']);
-  }
-
   protected readonly tiposAlquiler = [
     TipoAlquiler.CASA_COMPLETA,
     TipoAlquiler.POR_HABITACIONES,
@@ -321,22 +320,6 @@ export class PropietarioDashboardComponent {
     this.casasLocales.set(list);
   }
 
-  /** Si existe GET detalle, persiste cupos en LS para sesiones sin detalle. */
-  private actualizarCuposEnLocal(codigo: number, casa: CasaRuralResponse) {
-    const list = this.readCasasLs().map((c) =>
-      c.codigoCasa === codigo
-        ? {
-            ...c,
-            numeroDormitorios: casa.numeroDormitorios,
-            numeroCocinas: casa.numeroCocinas,
-            poblacion: casa.poblacion || c.poblacion,
-            descripcion: casa.descripcion ?? c.descripcion,
-          }
-        : c
-    );
-    this.persistCasas(list);
-  }
-
   /** Cupos conocidos sin GET completo (solo para límites UI). */
   private construirCasaDetalleDesdeLocal(codigo: number): CasaRuralResponse | null {
     const c = this.casasLocales().find((x) => x.codigoCasa === codigo);
@@ -358,7 +341,7 @@ export class PropietarioDashboardComponent {
       numeroCocinas: c.numeroCocinas,
       numeroComedores: 0,
       plazasGaraje: 0,
-      fotos: [],
+      fotos: c.fotos ?? [],
     };
   }
 
@@ -446,6 +429,8 @@ export class PropietarioDashboardComponent {
             descripcion: res.descripcion,
             numeroDormitorios: res.numeroDormitorios,
             numeroCocinas: res.numeroCocinas,
+            previewUrl: res.fotos?.[0]?.url,
+            fotos: res.fotos ?? [],
           });
           this.persistCasas(list);
           this.casaActivaDetalle.set(res);
@@ -475,21 +460,13 @@ export class PropietarioDashboardComponent {
       paquetes: this.paqueteService.listarPaquetesPorCasa(codigo),
       dormitorios: this.dormitorioService.listarDormitorios(codigo),
       cocinas: this.cocinaService.listarCocinas(codigo),
-      casa: this.casaService
-        .obtenerCasaPorCodigo(codigo)
-        .pipe(catchError(() => of(null))),
     }).subscribe({
       next: (res) => {
         this.paquetes.set(res.paquetes);
         this.dormitorios.set(res.dormitorios);
         this.cocinas.set(res.cocinas);
-        if (res.casa) {
-          this.casaActivaDetalle.set(res.casa);
-          this.actualizarCuposEnLocal(codigo, res.casa);
-        } else {
-          const fallback = this.construirCasaDetalleDesdeLocal(codigo);
-          this.casaActivaDetalle.set(fallback);
-        }
+        const fallback = this.construirCasaDetalleDesdeLocal(codigo);
+        this.casaActivaDetalle.set(fallback);
         this.loading.set(false);
       },
       error: (err: HttpErrorResponse) => {

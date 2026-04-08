@@ -79,7 +79,6 @@
         }
       </div>
       <div class="prop-header__actions">
-        <button type="button" class="btn btn--ghost" (click)="irVistaPrevia()">Vista previa (cliente)</button>
         <button type="button" class="btn btn--outline" (click)="logout()">Cerrar sesión</button>
       </div>
     </header>
@@ -473,7 +472,9 @@
               <div class="data-grid data-grid--dorms" role="list">
                 @for (d of dormitorios(); track d.idDormitorio) {
                   <article class="data-card data-card--dorm" role="listitem">
-                    <h3 class="data-card__name">{{ d.nombre }}</h3>
+                    <h3 class="data-card__name">
+                      {{ $any(d).nombre ?? ('Dormitorio #' + d.idDormitorio) }}
+                    </h3>
                     <dl class="data-card__meta">
                       <div>
                         <dt>Camas</dt>

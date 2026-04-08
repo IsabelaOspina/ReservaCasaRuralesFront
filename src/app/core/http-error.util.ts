@@ -1,23 +1,43 @@
 import { HttpErrorResponse } from '@angular/common/http';
 
-export function readApiError(err: HttpErrorResponse): string {
-  const body = err.error;
-  if (typeof body === 'object' && body !== null) {
-    if ('message' in body && typeof (body as { message: unknown }).message === 'string') {
-      const m = (body as { message: string }).message;
-      if (m.trim()) return m;
-    }
-    if ('detail' in body && typeof (body as { detail: unknown }).detail === 'string') {
-      const d = (body as { detail: string }).detail;
-      if (d.trim()) return d;
-    }
-    if ('detalle' in body && typeof (body as { detalle: unknown }).detalle === 'string') {
-      return (body as { detalle: string }).detalle;
-    }
-    if ('error' in body && typeof (body as { error: unknown }).error === 'string') {
-      return (body as { error: string }).error;
-    }
+function coerceErrorBody(body: unknown): unknown {
+  if (typeof body !== 'string') return body;
+  const s = body.trim();
+  if (!s.startsWith('{') || !s.endsWith('}')) return body;
+  try {
+    return JSON.parse(s) as unknown;
+  } catch {
+    return body;
   }
-  if (typeof body === 'string' && body.trim()) return body;
-  return err.message || 'Error de red o servidor';
+}
+
+/**
+ * Mensaje legible para el usuario (nunca devuelve JSON crudo si el backend manda string JSON).
+ */
+export function readApiError(err: HttpErrorResponse): string {
+  let body = coerceErrorBody(err.error);
+
+  if (typeof body === 'object' && body !== null && !Array.isArray(body)) {
+    const o = body as Record<string, unknown>;
+    const pick = (...keys: string[]) => {
+      for (const k of keys) {
+        const v = o[k];
+        if (typeof v === 'string' && v.trim()) return v.trim();
+      }
+      return null;
+    };
+    const msg =
+      pick('message', 'detail', 'detalle', 'error', 'mensaje') ??
+      (typeof o['error'] === 'object' &&
+      o['error'] !== null &&
+      'message' in (o['error'] as object) &&
+      typeof (o['error'] as { message: unknown }).message === 'string'
+        ? String((o['error'] as { message: string }).message).trim()
+        : null);
+    if (msg) return msg;
+  }
+
+  if (typeof body === 'string' && body.trim()) return body.trim();
+  if (err.status === 0) return 'No hay conexión. Comprueba tu red e inténtalo de nuevo.';
+  return err.message || 'No se pudo completar la operación. Inténtalo de nuevo.';
 }

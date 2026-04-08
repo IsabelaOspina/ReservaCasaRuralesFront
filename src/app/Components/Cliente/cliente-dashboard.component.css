@@ -228,6 +228,12 @@
   color: var(--rural-earth);
 }
 
+.cli__h3--divider {
+  margin-top: 1.35rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(160, 82, 45, 0.18);
+}
+
 .cli__active-hint {
   margin: 0;
   font-size: 0.82rem;
@@ -687,22 +693,205 @@
   gap: 0.5rem;
 }
 
-.cli__info-pago {
-  padding: 0.75rem;
+.cli__pago-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.55rem;
+}
+
+.cli__pago-action {
+  font-weight: 600;
+}
+
+.cli__pago-summary {
+  margin-top: 0.25rem;
+  padding: 1rem 1.1rem;
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(255, 251, 235, 0.95) 0%, rgba(245, 245, 220, 0.75) 100%);
+  border: 1px solid rgba(107, 142, 35, 0.22);
+  box-shadow: 0 4px 18px rgba(62, 47, 25, 0.06);
+}
+
+.cli__pago-summary__title {
+  margin: 0 0 0.85rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--rural-green-dark);
+  letter-spacing: -0.02em;
+}
+
+.cli__pago-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.cli__pago-stat {
+  padding: 0.65rem 0.75rem;
   border-radius: 10px;
-  background: rgba(245, 245, 220, 0.5);
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(160, 82, 45, 0.12);
+}
+
+.cli__pago-stat__label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-500);
+  margin-bottom: 0.2rem;
+}
+
+.cli__pago-stat__value {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text-900);
+  font-variant-numeric: tabular-nums;
+}
+
+.cli__pago-stat__value--accent {
+  color: var(--rural-green-dark);
+}
+
+.cli__pago-bank {
+  padding-top: 0.85rem;
+  border-top: 1px dashed rgba(160, 82, 45, 0.25);
+}
+
+.cli__pago-bank__head {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--rural-earth);
+  margin-bottom: 0.5rem;
+}
+
+.cli__pago-bank__row {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--text-800);
+}
+
+.cli__pago-bank__k {
+  display: inline-block;
+  min-width: 4.2rem;
+  font-weight: 600;
+  color: var(--text-600);
+}
+
+.cli__pago-iban {
+  display: inline-block;
+  margin-top: 0.15rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(160, 82, 45, 0.2);
   font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-900);
 }
 
-.cli__info-pago p {
-  margin: 0.25rem 0;
+.cli__pagos-list-wrap {
+  margin-top: 0.5rem;
 }
 
-.cli__list-pagos {
+.cli__pagos-list__title {
+  margin: 0 0 0.65rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--rural-earth);
+}
+
+.cli__pagos-cards {
+  list-style: none;
   margin: 0;
-  padding-left: 1.1rem;
-  font-size: 0.85rem;
-  line-height: 1.5;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.cli__pago-card {
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid rgba(160, 82, 45, 0.16);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+}
+
+.cli__pago-card__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.55rem;
+}
+
+.cli__pago-card__id {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-600);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.cli__pago-card__amount {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--rural-green-dark);
+  font-variant-numeric: tabular-nums;
+}
+
+.cli__pago-card__chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.cli__pago-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: rgba(107, 142, 35, 0.12);
+  color: var(--rural-green-dark);
+  border: 1px solid rgba(107, 142, 35, 0.2);
+}
+
+.cli__pago-chip--date {
+  background: rgba(245, 245, 220, 0.85);
+  color: var(--text-700);
+  border-color: rgba(160, 82, 45, 0.15);
+}
+
+.cli__pago-badge {
+  margin-left: auto;
+  padding: 0.28rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cli__pago-badge--ok {
+  background: rgba(34, 197, 94, 0.16);
+  color: #14532d;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
+
+.cli__pago-badge--wait {
+  background: rgba(234, 179, 8, 0.18);
+  color: #713f12;
+  border: 1px solid rgba(234, 179, 8, 0.4);
 }
 
 .cli__chk {

@@ -26,8 +26,7 @@
 
   @if (hayDatosCasaCargados() && nombreCasaMostrar()) {
     <p class="cli__pill" role="status">
-      Datos cargados para <strong>{{ nombreCasaMostrar() }}</strong> — la información mostrada corresponde a esa
-      casa.
+      Casa seleccionada: <strong>{{ nombreCasaMostrar() }}</strong>
     </p>
   }
 
@@ -331,8 +330,7 @@
       <section class="cli__card" id="sec-pagos">
         <h2 class="cli__h2"><span class="cli__num">6</span> Pagos</h2>
         <p class="cli__pagos-intro">
-          Primero revisa el resumen de importes y datos bancarios; si no cargan, puedes registrar el pago directamente
-          abajo.
+          Indica el ID de la reserva y consulta importes y datos bancarios, o revisa los pagos ya registrados.
         </p>
         <form [formGroup]="pagoForm" class="cli__pago-form" (ngSubmit)="registrarPago()">
           <label class="cli__field">
@@ -348,30 +346,79 @@
               <span class="cli__err">Indica un ID de reserva válido.</span>
             }
           </label>
-          <div class="cli__btn-row">
-            <button type="button" class="cli__btn cli__btn--secondary" (click)="cargarInfoPago()">Ver info transferencia</button>
-            <button type="button" class="cli__btn cli__btn--secondary" (click)="listarPagosReserva()">Listar pagos</button>
+          <div class="cli__pago-actions">
+            <button
+              type="button"
+              class="cli__btn cli__btn--secondary cli__pago-action"
+              (click)="cargarInfoPago()"
+              [disabled]="loadingPagos()"
+            >
+              Datos para transferencia
+            </button>
+            <button
+              type="button"
+              class="cli__btn cli__btn--secondary cli__pago-action"
+              (click)="listarPagosReserva()"
+              [disabled]="loadingPagos()"
+            >
+              Ver pagos de la reserva
+            </button>
           </div>
           @if (pagoInfo(); as info) {
-            <div class="cli__info-pago">
-              <p>Total: <strong>{{ info.totalAPagar | number: '1.2-2' }}</strong> €</p>
-              <p>Anticipo mínimo: <strong>{{ info.anticipoReserva | number: '1.2-2' }}</strong> €</p>
-              <p>Saldo restante: <strong>{{ info.saldoRestante | number: '1.2-2' }}</strong> €</p>
-              <p>Banco: {{ info.banco }} · Cuenta: {{ info.numeroCuenta }}</p>
+            <div class="cli__pago-summary" role="region" aria-label="Resumen de pago">
+              <h3 class="cli__pago-summary__title">Resumen de importes</h3>
+              <div class="cli__pago-stats">
+                <div class="cli__pago-stat">
+                  <span class="cli__pago-stat__label">Total a pagar</span>
+                  <span class="cli__pago-stat__value">{{ info.totalAPagar | number: '1.2-2' }} €</span>
+                </div>
+                <div class="cli__pago-stat">
+                  <span class="cli__pago-stat__label">Anticipo mínimo</span>
+                  <span class="cli__pago-stat__value cli__pago-stat__value--accent">{{ info.anticipoReserva | number: '1.2-2' }} €</span>
+                </div>
+                <div class="cli__pago-stat">
+                  <span class="cli__pago-stat__label">Saldo restante</span>
+                  <span class="cli__pago-stat__value">{{ info.saldoRestante | number: '1.2-2' }} €</span>
+                </div>
+              </div>
+              <div class="cli__pago-bank">
+                <span class="cli__pago-bank__head">Datos bancarios</span>
+                <p class="cli__pago-bank__row"><span class="cli__pago-bank__k">Banco</span> {{ info.banco }}</p>
+                <p class="cli__pago-bank__row">
+                  <span class="cli__pago-bank__k">Cuenta</span>
+                  <code class="cli__pago-iban">{{ info.numeroCuenta }}</code>
+                </p>
+              </div>
             </div>
           }
           @if (pagosLista().length) {
-            <ul class="cli__list-pagos">
-              @for (pg of pagosLista(); track pg.idPago) {
-                <li>
-                  #{{ pg.idPago }} — {{ pg.monto | number: '1.2-2' }} € · {{ pg.metodoPago }} · {{ pg.fechaPago }} ·
-                  {{ pg.confirmado ? 'confirmado' : 'pendiente' }}
-                </li>
-              }
-            </ul>
+            <div class="cli__pagos-list-wrap" role="region" aria-label="Pagos registrados">
+              <h3 class="cli__pagos-list__title">Pagos de esta reserva</h3>
+              <ul class="cli__pagos-cards">
+                @for (pg of pagosLista(); track pg.idPago) {
+                  <li class="cli__pago-card">
+                    <div class="cli__pago-card__row">
+                      <span class="cli__pago-card__id">Pago #{{ pg.idPago }}</span>
+                      <span class="cli__pago-card__amount">{{ pg.monto | number: '1.2-2' }} €</span>
+                    </div>
+                    <div class="cli__pago-card__chips">
+                      <span class="cli__pago-chip">{{ etiquetaMetodoPago(pg.metodoPago) }}</span>
+                      <span class="cli__pago-chip cli__pago-chip--date">{{ pg.fechaPago }}</span>
+                      <span
+                        class="cli__pago-badge"
+                        [class.cli__pago-badge--ok]="pg.confirmado"
+                        [class.cli__pago-badge--wait]="!pg.confirmado"
+                      >
+                        {{ pg.confirmado ? 'Confirmado' : 'Pendiente' }}
+                      </span>
+                    </div>
+                  </li>
+                }
+              </ul>
+            </div>
           }
 
-          <h3 class="cli__h3">Registrar pago</h3>
+          <h3 class="cli__h3 cli__h3--divider">Registrar pago</h3>
           <div class="cli__grid2">
             <label class="cli__field">
               <span class="cli__label">Monto</span>

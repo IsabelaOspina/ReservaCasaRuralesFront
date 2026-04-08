@@ -11,6 +11,7 @@ import {
 } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { UsuarioService } from '../../Services/usuario.service';
+import { readApiError } from '../../core/http-error.util';
 import { ClienteRequest } from '../../DTO/cliente-request';
 import { PropietarioRequest } from '../../DTO/propietario-request';
 
@@ -129,20 +130,6 @@ export class RegistroComponent implements OnInit {
     this.form.markAsUntouched();
   }
 
-  private static extractApiError(err: HttpErrorResponse): string {
-    const body = err.error;
-    if (typeof body === 'object' && body !== null) {
-      if ('error' in body && typeof (body as { error: unknown }).error === 'string') {
-        return (body as { error: string }).error;
-      }
-      if ('detalle' in body && typeof (body as { detalle: unknown }).detalle === 'string') {
-        return (body as { detalle: string }).detalle;
-      }
-    }
-    if (typeof body === 'string' && body.trim()) return body;
-    return err.message || 'Error al registrar';
-  }
-
   protected onSubmit() {
     this.errorMessage.set('');
     this.successMessage.set('');
@@ -171,7 +158,7 @@ export class RegistroComponent implements OnInit {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.errorMessage.set(RegistroComponent.extractApiError(err));
+          this.errorMessage.set(readApiError(err));
         },
       });
     } else {
@@ -194,7 +181,7 @@ export class RegistroComponent implements OnInit {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.errorMessage.set(RegistroComponent.extractApiError(err));
+          this.errorMessage.set(readApiError(err));
         },
       });
     }
