@@ -937,6 +937,11 @@
   font-weight: 600;
 }
 
+.cli__price-est {
+  margin: 0.75rem 0 0;
+  font-size: 0.9rem;
+}
+
 /* Modal galería */
 .cli-modal {
   position: fixed;

@@ -262,6 +262,9 @@
                     />
                     <span>
                       <strong>{{ d.nombre }}</strong> — {{ d.tipoCama }}, {{ d.numeroCamas }} cama(s)
+                      <span class="cli__muted">
+                        ({{ (factorDormitorio(d) * 100) | number: '1.0-0' }}% del precio base)
+                      </span>
                     </span>
                   </label>
                 </li>
@@ -331,6 +334,14 @@
           <button type="submit" class="cli__btn cli__btn--primary" [disabled]="!canCrearReserva()">
             {{ loadingReserva() ? 'Creando…' : 'Crear reserva' }}
           </button>
+          @if (precioReservaEstimado(); as est) {
+            <p class="cli__muted cli__price-est">
+              Estimado: <strong>{{ est.porNoche | number: '1.2-2' }} €</strong> / noche ·
+              Total: <strong>{{ est.total | number: '1.2-2' }} €</strong>
+            </p>
+          } @else if (mostrarSeleccionDormitoriosReserva() && selectedDormIds().length === 0) {
+            <p class="cli__muted cli__price-est">Selecciona dormitorios para calcular el total.</p>
+          }
         </form>
         @if (ultimaReserva(); as ur) {
           <div class="cli__reserva-ok">

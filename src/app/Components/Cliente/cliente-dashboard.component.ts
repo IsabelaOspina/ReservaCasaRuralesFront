@@ -21,6 +21,7 @@ import { CasaRuralResponse } from '../../DTO/CasaRural-response';
 import { MetodoPago } from '../../DTO/pago-request';
 import { PaqueteAlquilerResponse } from '../../DTO/paquete-response';
 import { DormitorioResponse } from '../../DTO/Dormitorio-response';
+import { TipoCama } from '../../DTO/Dormitorio-request';
 import { ReservaResponse } from '../../DTO/reserva-response';
 import { PagoResponse } from '../../DTO/pago-response';
 import { FotoResponse } from '../../DTO/Foto-response';
@@ -503,6 +504,49 @@ export class ClienteDashboardComponent {
     return p?.tipoAlquiler === TipoAlquiler.POR_HABITACIONES;
   }
 
+  private paqueteSeleccionado(): PaqueteAlquilerResponse | null {
+    const id = this.reservaForm.getRawValue().paqueteId;
+    if (!id) return null;
+    return this.paquetes().find((x) => x.idPaquete === id) ?? null;
+  }
+
+  private dormitoriosSeleccionados(): DormitorioResponse[] {
+    const ids = new Set(this.selectedDormIds());
+    if (ids.size === 0) return [];
+    return this.dormitorios().filter((d) => ids.has(d.idDormitorio));
+  }
+
+  /**
+   * Precio por noche de una habitación según tipo de cama.
+   * - SENCILLA: 1x
+   * - DOBLE: 1.25x (un poco más)
+   */
+  protected factorDormitorio(d: DormitorioResponse): number {
+    return d.tipoCama === TipoCama.DOBLE ? 1.25 : 1;
+  }
+
+  protected totalHabitacionesFactor(): number {
+    const sel = this.dormitoriosSeleccionados();
+    if (sel.length === 0) return 0;
+    return sel.reduce((acc, d) => acc + this.factorDormitorio(d), 0);
+  }
+
+  /** Estimación de precio (UI): para «por habitaciones» escala según habitaciones y tipo de cama. */
+  protected precioReservaEstimado(): { porNoche: number; total: number } | null {
+    const p = this.paqueteSeleccionado();
+    if (!p) return null;
+    const noches = Number(this.reservaForm.getRawValue().noches) || 0;
+    if (noches <= 0) return null;
+
+    let porNoche = Number(p.precio) || 0;
+    if (p.tipoAlquiler === TipoAlquiler.POR_HABITACIONES) {
+      const f = this.totalHabitacionesFactor();
+      porNoche = porNoche * (f > 0 ? f : 0);
+    }
+    const total = porNoche * noches;
+    return { porNoche, total };
+  }
+
   private setPagoFeedback(tipo: 'error' | 'success', texto: string) {
     this.pagoMensaje.set({ tipo, texto });
     setTimeout(() =>
@@ -539,6 +583,9 @@ export class ClienteDashboardComponent {
     if (this.paquetes().length === 0) return false;
     const tel = this.reservaForm.get('telefonoContacto');
     if (!tel?.valid) return false;
+    if (this.mostrarSeleccionDormitoriosReserva() && this.selectedDormIds().length === 0) {
+      return false;
+    }
     return this.reservaForm.valid;
   }
 
@@ -665,6 +712,10 @@ export class ClienteDashboardComponent {
       this.reservaForm.markAllAsTouched();
       return;
     }
+    if (this.mostrarSeleccionDormitoriosReserva() && this.selectedDormIds().length === 0) {
+      this.error.set('Selecciona al menos 1 dormitorio para el paquete por habitaciones.');
+      return;
+    }
     this.loadingReserva.set(true);
     const r = this.reservaForm.getRawValue();
     const body: {
@@ -698,6 +749,8 @@ export class ClienteDashboardComponent {
         this.success.set(
           `Reserva creada con ID ${res.id}. Fecha límite de pago: ${res.fechaLimitePago}`
         );
+        this.selectedDormIds.set([]);
+        this.reservaForm.patchValue({ fechaInicio: '', noches: 3 });
       },
       error: (err: HttpErrorResponse) => {
         this.loadingReserva.set(false);
@@ -749,6 +802,11 @@ export class ClienteDashboardComponent {
       return;
     }
     const p = this.pagoForm.getRawValue();
+    const info = this.pagoInfo();
+    if (info && Number.isFinite(info.totalAPagar) && p.monto > info.totalAPagar) {
+      this.setPagoFeedback('error', 'El pago excede el total de la reserva');
+      return;
+    }
     this.loadingPagos.set(true);
     this.pagoService
       .registrarPago({
@@ -762,6 +820,12 @@ export class ClienteDashboardComponent {
         next: () => {
           this.loadingPagos.set(false);
           this.setPagoFeedback('success', 'Pago registrado correctamente.');
+          const hoy = new Date().toISOString().slice(0, 10);
+          this.pagoForm.patchValue({
+            monto: 0,
+            metodoPago: MetodoPago.TRANSFERENCIA,
+            fechaPago: hoy,
+          });
           this.listarPagosReserva({ preserveBanner: true });
           this.cargarInfoPago({ preserveBanner: true });
         },
