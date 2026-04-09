@@ -264,6 +264,7 @@
                       <label class="form-field">
                         <span class="form-label">Imagen {{ i + 1 }}</span>
                         <input
+                          #fotoFileInput
                           type="file"
                           accept="image/*"
                           class="input-file"
@@ -453,12 +454,23 @@
             @if (maxDormitoriosPermitidos() !== null) {
               <p class="cupo-banner">
                 Registrados <strong>{{ dormitorios().length }}</strong> de
-                <strong>{{ maxDormitoriosPermitidos() }}</strong> dormitorios (tope fijado al dar de alta la casa).
+                <strong>{{ maxDormitoriosPermitidos() }}</strong> dormitorios (tope al dar de alta la casa).
               </p>
+              @if (maxBanosPermitidos() !== null) {
+                <p class="cupo-banner cupo-banner--banos">
+                  Baños asignados a dormitorios: <strong>{{ banosAsignadosEnDormitorios() }}</strong> de
+                  <strong>{{ maxBanosPermitidos() }}</strong> (según baños declarados en la ficha).
+                </p>
+              }
+              @if (cupoBanosLleno() && !cupoDormitoriosLleno()) {
+                <p class="alert alert--info" role="status">
+                  Cupo de baños completo: no puedes marcar más dormitorios con baño. Quita el baño en este registro o
+                  revisa los dormitorios ya creados.
+                </p>
+              }
               @if (cupoDormitoriosLleno()) {
                 <p class="alert alert--info" role="status">
-                  Cupo completo: no puedes registrar más dormitorios que los declarados en la ficha. Si el backend
-                  añade edición de la casa, podrás ajustar ese límite allí.
+                  Cupo de dormitorios completo: has llegado al máximo declarado en la ficha.
                 </p>
               }
             } @else if (!loading()) {

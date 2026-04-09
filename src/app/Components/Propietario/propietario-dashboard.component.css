@@ -271,6 +271,12 @@
   color: var(--text-700);
 }
 
+.cupo-banner--banos {
+  margin-top: -0.35rem;
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.22);
+}
+
 .cupo-banner--muted {
   background: rgba(245, 245, 220, 0.65);
   border-style: dashed;

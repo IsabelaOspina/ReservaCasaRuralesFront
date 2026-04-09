@@ -152,6 +152,7 @@ export class RegistroComponent implements OnInit {
         next: (text: string) => {
           this.loading.set(false);
           this.errorMessage.set('');
+          localStorage.setItem('cliente_telefono_registro', payload.telefonoContacto);
           this.successMessage.set(text.trim() || 'Cliente registrado correctamente');
           this.limpiarAfterSuccess();
           setTimeout(() => this.router.navigate(['/login']), 2000);

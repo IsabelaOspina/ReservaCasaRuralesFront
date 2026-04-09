@@ -122,6 +122,15 @@
                   <button
                     type="button"
                     class="cli__btn cli__btn--secondary cli__btn--sm"
+                    (click)="abrirFichaCasa(c)"
+                    [disabled]="loadingPaquetes()"
+                    title="Ver descripción y datos de la casa"
+                  >
+                    Ver ficha
+                  </button>
+                  <button
+                    type="button"
+                    class="cli__btn cli__btn--secondary cli__btn--sm"
                     (click)="abrirGaleriaCasa(c)"
                     [disabled]="loadingPaquetes() || loadingGaleriaCasa()"
                     title="Ver fotos de esta casa"
@@ -234,28 +243,36 @@
         </section>
       </div>
 
-      <!-- 4. Dormitorios -->
+      <!-- 4. Dormitorios (solo paquete «por habitaciones») -->
       <section class="cli__card" id="sec-dorms">
-        <h2 class="cli__h2"><span class="cli__num">4</span> Dormitorios <span class="cli__h2-sub">(opcionales en la reserva)</span></h2>
-        @if (dormitorios().length === 0) {
-          <p class="cli__muted">No hay dormitorios disponibles para esta casa.</p>
+        <h2 class="cli__h2"><span class="cli__num">4</span> Dormitorios</h2>
+        @if (mostrarSeleccionDormitoriosReserva()) {
+          <p class="cli__lead cli__lead--tight">Elige habitaciones solo para reservas con paquete «Por habitaciones».</p>
+          @if (dormitorios().length === 0) {
+            <p class="cli__muted">No hay dormitorios disponibles para esta casa.</p>
+          } @else {
+            <ul class="cli__dorm-chips">
+              @for (d of dormitorios(); track d.idDormitorio) {
+                <li>
+                  <label class="cli__dorm">
+                    <input
+                      type="checkbox"
+                      [checked]="isDormSelected(d.idDormitorio)"
+                      (change)="toggleDorm(d.idDormitorio)"
+                    />
+                    <span>
+                      <strong>{{ d.nombre }}</strong> — {{ d.tipoCama }}, {{ d.numeroCamas }} cama(s)
+                    </span>
+                  </label>
+                </li>
+              }
+            </ul>
+          }
         } @else {
-          <ul class="cli__dorm-chips">
-            @for (d of dormitorios(); track d.idDormitorio) {
-              <li>
-                <label class="cli__dorm">
-                  <input
-                    type="checkbox"
-                    [checked]="isDormSelected(d.idDormitorio)"
-                    (change)="toggleDorm(d.idDormitorio)"
-                  />
-                  <span>
-                    <strong>{{ d.nombre }}</strong> — {{ d.tipoCama }}, {{ d.numeroCamas }} cama(s)
-                  </span>
-                </label>
-              </li>
-            }
-          </ul>
+          <p class="cli__muted">
+            La elección de habitaciones no aplica para paquetes de <strong>casa completa</strong> u otros tipos; solo
+            cuando el paquete sea <strong>por habitaciones</strong>.
+          </p>
         }
       </section>
 
@@ -297,16 +314,17 @@
               </select>
             </label>
             <label class="cli__field cli__span2">
-              <span class="cli__label">Teléfono de contacto (opcional)</span>
+              <span class="cli__label">Teléfono de contacto</span>
               <input
                 type="tel"
                 formControlName="telefonoContacto"
                 placeholder="+34 600 000 000"
+                autocomplete="tel"
                 [class.cli__input--invalid]="fieldState('reserva', 'telefonoContacto') === 'invalid'"
                 [class.cli__input--valid]="fieldState('reserva', 'telefonoContacto') === 'valid'"
               />
               @if (reservaForm.get('telefonoContacto')?.invalid && (reservaForm.get('telefonoContacto')?.dirty || reservaForm.get('telefonoContacto')?.touched)) {
-                <span class="cli__err">Formato no válido (7–20 dígitos o vacío).</span>
+                <span class="cli__err">Indica un teléfono válido (obligatorio, 7–20 caracteres).</span>
               }
             </label>
           </div>
@@ -329,6 +347,17 @@
       <!-- 6. Pagos -->
       <section class="cli__card" id="sec-pagos">
         <h2 class="cli__h2"><span class="cli__num">6</span> Pagos</h2>
+        @if (pagoMensaje(); as pm) {
+          <div
+            id="pago-feedback"
+            class="cli__pago-feedback"
+            [class.cli__pago-feedback--err]="pm.tipo === 'error'"
+            [class.cli__pago-feedback--ok]="pm.tipo === 'success'"
+            role="alert"
+          >
+            {{ pm.texto }}
+          </div>
+        }
         <p class="cli__pagos-intro">
           Indica el ID de la reserva y consulta importes y datos bancarios, o revisa los pagos ya registrados.
         </p>
@@ -448,10 +477,6 @@
                 [class.cli__input--valid]="fieldState('pago', 'fechaPago') === 'valid'"
               />
             </label>
-            <label class="cli__field cli__chk">
-              <input type="checkbox" formControlName="confirmado" />
-              <span>Confirmado</span>
-            </label>
           </div>
           <button type="submit" class="cli__btn cli__btn--primary" [disabled]="!canRegistrarPago()">
             {{ loadingPagos() ? 'Procesando…' : 'Registrar pago' }}
@@ -482,6 +507,55 @@
           </figure>
         }
       </div>
+    </div>
+  </div>
+}
+
+@if (modalFichaAbierta() && fichaCasaCatalogo(); as fc) {
+  <div class="cli-modal" role="dialog" aria-modal="true" aria-label="Ficha de la casa">
+    <div class="cli-modal__backdrop" (click)="cerrarFichaCasa()"></div>
+    <div class="cli-modal__panel cli-modal__panel--ficha">
+      <div class="cli-modal__head">
+        <h2 class="cli-modal__title">{{ fc.poblacion }} · {{ idPublicoCasa(fc.codigoCasa) }}</h2>
+        <button type="button" class="cli-modal__close" (click)="cerrarFichaCasa()" aria-label="Cerrar">×</button>
+      </div>
+      <p class="cli__muted cli-ficha__code">Código numérico: {{ fc.codigoCasa }}</p>
+      <div class="cli-ficha__desc">
+        <h3 class="cli-ficha__h">Descripción</h3>
+        <p>{{ fichaDescripcionTexto() }}</p>
+      </div>
+      <div class="cli-ficha__cupos">
+        <h3 class="cli-ficha__h">Capacidad y espacios</h3>
+        <dl class="cli-ficha__dl">
+          <div><dt>Dormitorios</dt><dd>{{ fichaCupos('numeroDormitorios') }}</dd></div>
+          <div><dt>Baños</dt><dd>{{ fichaCupos('numeroBanos') }}</dd></div>
+          <div><dt>Cocinas</dt><dd>{{ fichaCupos('numeroCocinas') }}</dd></div>
+          <div><dt>Comedores</dt><dd>{{ fichaCupos('numeroComedores') }}</dd></div>
+          <div><dt>Plazas de garaje</dt><dd>{{ fichaCupos('plazasGaraje') }}</dd></div>
+        </dl>
+      </div>
+      @if ((fc.fotos?.length ?? 0) > 0 || urlFotoSegura(fc.previewUrl)) {
+        <div class="cli-ficha__fotos">
+          <h3 class="cli-ficha__h">Fotos</h3>
+          <div class="cli-modal__grid cli-ficha__thumb-grid">
+            @if ((fc.fotos?.length ?? 0) > 0) {
+              @for (f of fc.fotos ?? []; track f.idFoto) {
+                <figure class="cli-modal__fig">
+                  @if (urlFotoSegura(f.url); as src) {
+                    <img [src]="src" [alt]="f.descripcion || 'Foto'" loading="lazy" />
+                  }
+                  <figcaption>{{ f.descripcion || 'Sin descripción' }}</figcaption>
+                </figure>
+              }
+            } @else if (urlFotoSegura(fc.previewUrl); as pv) {
+              <figure class="cli-modal__fig">
+                <img [src]="pv" alt="" loading="lazy" />
+                <figcaption>Vista previa</figcaption>
+              </figure>
+            }
+          </div>
+        </div>
+      }
     </div>
   </div>
 }

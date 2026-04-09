@@ -1,6 +1,13 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, inject, signal } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  QueryList,
+  ViewChildren,
+  inject,
+  signal,
+} from '@angular/core';
 import { forkJoin } from 'rxjs';
 import {
   AbstractControl,
@@ -46,6 +53,10 @@ export interface CasaRegistradaLocal {
   numeroDormitorios?: number;
   /** Tope de registros POST cocina. */
   numeroCocinas?: number;
+  /** Tope de baños en ficha (dormitorios con baño no pueden superarlo). */
+  numeroBanos?: number;
+  numeroComedores?: number;
+  plazasGaraje?: number;
   /** Miniatura/galería local (mientras no exista GET por código en backend). */
   previewUrl?: string;
   fotos?: FotoResponse[];
@@ -59,6 +70,9 @@ export interface CasaRegistradaLocal {
   styleUrl: './propietario-dashboard.component.css',
 })
 export class PropietarioDashboardComponent {
+  @ViewChildren('fotoFileInput')
+  private fotoFileInputs!: QueryList<ElementRef<HTMLInputElement>>;
+
   private readonly fb = inject(FormBuilder);
   private readonly casaService = inject(CasaRuralService);
   private readonly paqueteService = inject(PaqueteAlquilerService);
@@ -82,20 +96,24 @@ export class PropietarioDashboardComponent {
   protected readonly error = signal<string | null>(null);
   protected readonly success = signal<string | null>(null);
 
-  protected readonly casaForm = this.fb.nonNullable.group({
+  /** Valores iniciales vacíos; tras registrar una casa se resetea a vacío (no a «3,2,1…» que parecían datos viejos). */
+  protected readonly casaForm = this.fb.group({
     poblacion: ['', Validators.required],
     descripcion: ['', Validators.required],
-    numeroDormitorios: [3, [Validators.required, Validators.min(3)]],
-    numeroBanos: [2, [Validators.required, Validators.min(2)]],
-    numeroCocinas: [1, [Validators.required, Validators.min(1)]],
-    numeroComedores: [1, [Validators.required, Validators.min(0)]],
-    plazasGaraje: [0, [Validators.required, Validators.min(0)]],
+    numeroDormitorios: [
+      null as number | null,
+      [Validators.required, Validators.min(3)],
+    ],
+    numeroBanos: [null as number | null, [Validators.required, Validators.min(2)]],
+    numeroCocinas: [null as number | null, [Validators.required, Validators.min(1)]],
+    numeroComedores: [null as number | null, [Validators.required, Validators.min(0)]],
+    plazasGaraje: [null as number | null, [Validators.required, Validators.min(0)]],
   });
 
   /** Una fila por foto: archivo (en `fotoFiles`) + descripción. El API usa multipart con File[]. */
   protected readonly fotosRows = this.fb.nonNullable.array([
     this.fb.nonNullable.group({
-      descripcion: ['Fachada principal', Validators.required],
+      descripcion: ['', Validators.required],
     }),
   ]);
   protected fotoFiles: (File | null)[] = [null];
@@ -171,6 +189,36 @@ export class PropietarioDashboardComponent {
     const max = this.maxCocinasPermitidas();
     if (max == null) return false;
     return this.cocinas().length >= max;
+  }
+
+  /** Baños ya asignados en dormitorios con «tiene baño». */
+  protected banosAsignadosEnDormitorios(): number {
+    return this.dormitorios().filter((d) => d.tieneBano).length;
+  }
+
+  protected maxBanosPermitidos(): number | null {
+    const d = this.casaActivaDetalle();
+    if (d != null && Number.isFinite(d.numeroBanos) && d.numeroBanos > 0) {
+      return d.numeroBanos;
+    }
+    const loc = this.casasLocales().find(
+      (x) => x.codigoCasa === this.codigoActivo()
+    );
+    if (
+      loc?.numeroBanos != null &&
+      Number.isFinite(loc.numeroBanos) &&
+      loc.numeroBanos > 0
+    ) {
+      return loc.numeroBanos;
+    }
+    return null;
+  }
+
+  /** Tope de baños alcanzado (según ficha de la casa). */
+  protected cupoBanosLleno(): boolean {
+    const max = this.maxBanosPermitidos();
+    if (max == null) return false;
+    return this.banosAsignadosEnDormitorios() >= max;
   }
 
   protected etiquetaTipoAlquiler(t: TipoAlquiler): string {
@@ -337,10 +385,10 @@ export class PropietarioDashboardComponent {
       poblacion: c.poblacion,
       descripcion: c.descripcion ?? '',
       numeroDormitorios: c.numeroDormitorios,
-      numeroBanos: 0,
+      numeroBanos: c.numeroBanos ?? 0,
       numeroCocinas: c.numeroCocinas,
-      numeroComedores: 0,
-      plazasGaraje: 0,
+      numeroComedores: c.numeroComedores ?? 0,
+      plazasGaraje: c.plazasGaraje ?? 0,
       fotos: c.fotos ?? [],
     };
   }
@@ -377,6 +425,44 @@ export class PropietarioDashboardComponent {
     return f ? f.name : 'Ningún archivo seleccionado';
   }
 
+  /** Deja el formulario listo para registrar otra casa (evita confundir con datos ya guardados). */
+  private resetFormularioAltaCasa(): void {
+    this.casaForm.reset({
+      poblacion: '',
+      descripcion: '',
+      numeroDormitorios: null,
+      numeroBanos: null,
+      numeroCocinas: null,
+      numeroComedores: null,
+      plazasGaraje: null,
+    });
+    while (this.fotosRows.length > 1) {
+      this.fotosRows.removeAt(this.fotosRows.length - 1);
+      this.fotoFiles.pop();
+    }
+    if (this.fotosRows.length === 0) {
+      this.fotosRows.push(
+        this.fb.nonNullable.group({
+          descripcion: ['', Validators.required],
+        })
+      );
+      this.fotoFiles = [null];
+    } else {
+      this.fotosRows.at(0)?.patchValue({ descripcion: '' });
+      this.fotoFiles = [null];
+    }
+    this.casaForm.markAsPristine();
+    this.casaForm.markAsUntouched();
+    this.fotosRows.markAsPristine();
+    this.fotosRows.markAsUntouched();
+    // Los <input type="file"> no están ligados al FormControl; hay que vaciar el DOM.
+    setTimeout(() => {
+      this.fotoFileInputs?.forEach((ref) => {
+        ref.nativeElement.value = '';
+      });
+    }, 0);
+  }
+
   protected registrarCasa() {
     this.clearMessages();
     for (let i = 0; i < this.fotosRows.length; i++) {
@@ -404,13 +490,13 @@ export class PropietarioDashboardComponent {
       fotos.push(this.fotoFiles[i]!);
     }
     const dto = new CasaRuralRequestDTO({
-      poblacion: c.poblacion.trim(),
-      descripcion: c.descripcion.trim(),
-      numeroDormitorios: c.numeroDormitorios,
-      numeroBanos: c.numeroBanos,
-      numeroCocinas: c.numeroCocinas,
-      numeroComedores: c.numeroComedores,
-      plazasGaraje: c.plazasGaraje,
+      poblacion: String(c.poblacion ?? '').trim(),
+      descripcion: String(c.descripcion ?? '').trim(),
+      numeroDormitorios: c.numeroDormitorios!,
+      numeroBanos: c.numeroBanos!,
+      numeroCocinas: c.numeroCocinas!,
+      numeroComedores: c.numeroComedores!,
+      plazasGaraje: c.plazasGaraje!,
       fotos,
       descripcionesFotos,
     });
@@ -428,7 +514,10 @@ export class PropietarioDashboardComponent {
             poblacion: res.poblacion,
             descripcion: res.descripcion,
             numeroDormitorios: res.numeroDormitorios,
+            numeroBanos: res.numeroBanos,
             numeroCocinas: res.numeroCocinas,
+            numeroComedores: res.numeroComedores,
+            plazasGaraje: res.plazasGaraje,
             previewUrl: res.fotos?.[0]?.url,
             fotos: res.fotos ?? [],
           });
@@ -437,6 +526,7 @@ export class PropietarioDashboardComponent {
           this.codigoActivo.set(res.codigoCasa);
           this.success.set(`Casa registrada. Código casa: ${res.codigoCasa}`);
           void this.refrescarListas(res.codigoCasa);
+          this.resetFormularioAltaCasa();
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
@@ -500,6 +590,14 @@ export class PropietarioDashboardComponent {
         next: () => {
           this.loading.set(false);
           this.success.set('Paquete creado');
+          this.paqueteForm.reset({
+            fechaInicio: '',
+            fechaFin: '',
+            precio: 100,
+            tipoAlquiler: TipoAlquiler.CASA_COMPLETA,
+          });
+          this.paqueteForm.markAsPristine();
+          this.paqueteForm.markAsUntouched();
           void this.refrescarListas(codigo);
         },
         error: (err: HttpErrorResponse) => {
@@ -555,6 +653,20 @@ export class PropietarioDashboardComponent {
       this.error.set('Sin casa activa');
       return;
     }
+    if (this.dormForm.invalid) {
+      this.dormForm.markAllAsTouched();
+      return;
+    }
+    const v = this.dormForm.getRawValue();
+    if (v.tieneBano && this.cupoBanosLleno()) {
+      const mb = this.maxBanosPermitidos();
+      this.error.set(
+        mb != null
+          ? `Has alcanzado el máximo de baños declarados en la ficha (${mb}). Quita «Tiene baño» en este dormitorio o revisa los ya registrados.`
+          : 'No se pueden asignar más baños de los declarados en la ficha.'
+      );
+      return;
+    }
     if (this.cupoDormitoriosLleno()) {
       const max = this.maxDormitoriosPermitidos();
       this.error.set(
@@ -564,11 +676,6 @@ export class PropietarioDashboardComponent {
       );
       return;
     }
-    if (this.dormForm.invalid) {
-      this.dormForm.markAllAsTouched();
-      return;
-    }
-    const v = this.dormForm.getRawValue();
     this.loading.set(true);
     this.dormitorioService
       .registrarDormitorio(codigo, {
@@ -585,7 +692,16 @@ export class PropietarioDashboardComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.error.set(readApiError(err));
+          let msg = readApiError(err);
+          if (
+            /dormitorio/i.test(msg) &&
+            v.tieneBano &&
+            this.cupoBanosLleno()
+          ) {
+            msg =
+              'No se pueden asignar más baños de los declarados en la ficha de la casa.';
+          }
+          this.error.set(msg);
         },
       });
   }

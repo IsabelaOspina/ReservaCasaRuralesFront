@@ -15,6 +15,7 @@ import { ReservaService } from '../../Services/reserva.service';
 import { DormitorioService } from '../../Services/dormitorio.service';
 import { CasaRuralService } from '../../Services/casarural.service';
 import { readApiError } from '../../core/http-error.util';
+import { decodeJwtPayload } from '../../core/auth/jwt.util';
 import { resolveFotoSrc } from '../../core/foto-url.util';
 import { CasaRuralResponse } from '../../DTO/CasaRural-response';
 import { MetodoPago } from '../../DTO/pago-request';
@@ -33,6 +34,8 @@ const LS_CODIGO = 'cliente_codigo_casa';
 const SS_RESERVA = 'cliente_ultima_reserva';
 const LS_CATALOGO = 'cliente_catalogo_casas';
 const LS_PROPIETARIO_CASAS = 'propietario_casas';
+/** Teléfono guardado al registrar como cliente (misma sesión / dispositivo). */
+const LS_CLIENTE_TEL = 'cliente_telefono_registro';
 
 /** Casas que el cliente ha cargado al menos una vez (sin API de listado global). */
 export interface CasaClienteCatalogo {
@@ -41,6 +44,12 @@ export interface CasaClienteCatalogo {
   descripcion?: string;
   previewUrl?: string;
   fotos?: FotoResponse[];
+  /** Cupos de ficha si vienen de la API o del panel propietario (mismo navegador). */
+  numeroDormitorios?: number;
+  numeroBanos?: number;
+  numeroCocinas?: number;
+  numeroComedores?: number;
+  plazasGaraje?: number;
 }
 
 @Component({
@@ -85,10 +94,17 @@ export class ClienteDashboardComponent {
 
   protected readonly error = signal<string | null>(null);
   protected readonly success = signal<string | null>(null);
+  /** Avisos solo de la sección Pagos (no se muestran en la barra superior). */
+  protected readonly pagoMensaje = signal<{
+    tipo: 'error' | 'success';
+    texto: string;
+  } | null>(null);
 
   protected readonly modalGaleriaAbierta = signal(false);
   /** Detalle cargado solo para el modal (p. ej. otra casa de la tira sin ser la activa). */
   protected readonly galeriaCasa = signal<CasaRuralResponse | null>(null);
+  protected readonly modalFichaAbierta = signal(false);
+  protected readonly fichaCasaCatalogo = signal<CasaClienteCatalogo | null>(null);
   protected readonly loadingGaleriaCasa = signal(false);
   protected readonly navActiva = signal<
     'flujo' | 'reservas' | 'disponibilidad' | 'pagos'
@@ -103,15 +119,16 @@ export class ClienteDashboardComponent {
     noches: [3, [Validators.required, Validators.min(1)]],
   });
 
-  private readonly telefonoOpcional = [
-    Validators.pattern(/^$|^\+?[0-9\s\-]{7,20}$/),
+  private readonly telefonoContactoValidators = [
+    Validators.required,
+    Validators.pattern(/^\+?[0-9\s\-]{7,20}$/),
   ];
 
   protected readonly reservaForm = this.fb.nonNullable.group({
     fechaInicio: ['', Validators.required],
     noches: [3, [Validators.required, Validators.min(1)]],
     paqueteId: [0, [Validators.required, Validators.min(1)]],
-    telefonoContacto: ['', this.telefonoOpcional],
+    telefonoContacto: ['', this.telefonoContactoValidators],
   });
 
   protected readonly pagoForm = this.fb.nonNullable.group({
@@ -119,7 +136,6 @@ export class ClienteDashboardComponent {
     monto: [0, [Validators.required, Validators.min(0.01)]],
     metodoPago: [MetodoPago.TRANSFERENCIA as MetodoPago, Validators.required],
     fechaPago: ['', Validators.required],
-    confirmado: [true],
   });
 
   protected readonly metodosPago = [
@@ -152,6 +168,28 @@ export class ClienteDashboardComponent {
     const hoy = new Date().toISOString().slice(0, 10);
     this.pagoForm.patchValue({ fechaPago: hoy });
 
+    let telPref = localStorage.getItem(LS_CLIENTE_TEL) ?? '';
+    if (!telPref) {
+      const tok = localStorage.getItem('token');
+      if (tok) {
+        const pl = decodeJwtPayload(tok);
+        const raw = pl?.['telefonoContacto'] ?? pl?.['telefono'];
+        if (typeof raw === 'string' && raw.trim()) {
+          telPref = raw.replace(/\s/g, '');
+        }
+      }
+    }
+    if (telPref) {
+      this.reservaForm.patchValue({ telefonoContacto: telPref });
+    }
+
+    this.reservaForm.get('paqueteId')?.valueChanges.subscribe((pid) => {
+      const p = this.paquetes().find((x) => x.idPaquete === pid);
+      if (p?.tipoAlquiler !== TipoAlquiler.POR_HABITACIONES) {
+        this.selectedDormIds.set([]);
+      }
+    });
+
     this.dispForm.valueChanges.subscribe(() => {
       const d = this.dispForm.getRawValue();
       this.reservaForm.patchValue(
@@ -180,8 +218,11 @@ export class ClienteDashboardComponent {
   private upsertCatalogo(entry: CasaClienteCatalogo) {
     const list = [...this.readCatalogo()];
     const i = list.findIndex((x) => x.codigoCasa === entry.codigoCasa);
-    if (i >= 0) list[i] = { ...list[i], ...entry };
-    else list.push(entry);
+    const defined = Object.fromEntries(
+      Object.entries(entry).filter(([, v]) => v !== undefined)
+    ) as CasaClienteCatalogo;
+    if (i >= 0) list[i] = { ...list[i], ...defined };
+    else list.push(defined);
     this.persistCatalogo(list);
     this.refrescarListadoCompleto();
   }
@@ -196,6 +237,11 @@ export class ClienteDashboardComponent {
         descripcion?: string;
         previewUrl?: string;
         fotos?: FotoResponse[];
+        numeroDormitorios?: number;
+        numeroBanos?: number;
+        numeroCocinas?: number;
+        numeroComedores?: number;
+        plazasGaraje?: number;
       }[];
       if (!Array.isArray(arr)) return [];
       return arr.map((x) => ({
@@ -204,10 +250,21 @@ export class ClienteDashboardComponent {
         descripcion: x.descripcion,
         previewUrl: x.previewUrl,
         fotos: x.fotos,
+        numeroDormitorios: x.numeroDormitorios,
+        numeroBanos: x.numeroBanos,
+        numeroCocinas: x.numeroCocinas,
+        numeroComedores: x.numeroComedores,
+        plazasGaraje: x.plazasGaraje,
       }));
     } catch {
       return [];
     }
+  }
+
+  private coalesceNumCat(a?: number, b?: number): number | undefined {
+    if (a != null && Number.isFinite(a)) return a;
+    if (b != null && Number.isFinite(b)) return b;
+    return undefined;
   }
 
   private mergeCasasFuente(api: CasaRuralResponse[]): CasaClienteCatalogo[] {
@@ -226,6 +283,11 @@ export class ClienteDashboardComponent {
         descripcion: c.descripcion ?? prev.descripcion,
         previewUrl: pv || prevPv || undefined,
         fotos: (c.fotos?.length ?? 0) > 0 ? c.fotos : prev.fotos,
+        numeroDormitorios: this.coalesceNumCat(c.numeroDormitorios, prev.numeroDormitorios),
+        numeroBanos: this.coalesceNumCat(c.numeroBanos, prev.numeroBanos),
+        numeroCocinas: this.coalesceNumCat(c.numeroCocinas, prev.numeroCocinas),
+        numeroComedores: this.coalesceNumCat(c.numeroComedores, prev.numeroComedores),
+        plazasGaraje: this.coalesceNumCat(c.plazasGaraje, prev.plazasGaraje),
       });
     };
     for (const r of api) {
@@ -236,6 +298,11 @@ export class ClienteDashboardComponent {
         descripcion: r.descripcion,
         previewUrl: r.fotos?.[0]?.url,
         fotos: r.fotos,
+        numeroDormitorios: r.numeroDormitorios,
+        numeroBanos: r.numeroBanos,
+        numeroCocinas: r.numeroCocinas,
+        numeroComedores: r.numeroComedores,
+        plazasGaraje: r.plazasGaraje,
       });
     }
     for (const c of this.readCatalogo()) add(c);
@@ -324,11 +391,11 @@ export class ClienteDashboardComponent {
       codigoCasa: c.codigoCasa,
       poblacion: c.poblacion,
       descripcion: c.descripcion ?? '',
-      numeroDormitorios: 0,
-      numeroBanos: 0,
-      numeroCocinas: 0,
-      numeroComedores: 0,
-      plazasGaraje: 0,
+      numeroDormitorios: c.numeroDormitorios ?? 0,
+      numeroBanos: c.numeroBanos ?? 0,
+      numeroCocinas: c.numeroCocinas ?? 0,
+      numeroComedores: c.numeroComedores ?? 0,
+      plazasGaraje: c.plazasGaraje ?? 0,
       fotos,
     };
   }
@@ -366,6 +433,45 @@ export class ClienteDashboardComponent {
     this.galeriaCasa.set(null);
   }
 
+  protected abrirFichaCasa(c: CasaClienteCatalogo) {
+    this.fichaCasaCatalogo.set(c);
+    this.modalFichaAbierta.set(true);
+  }
+
+  protected cerrarFichaCasa() {
+    this.modalFichaAbierta.set(false);
+    this.fichaCasaCatalogo.set(null);
+  }
+
+  protected fichaDescripcionTexto(): string {
+    const f = this.fichaCasaCatalogo();
+    if (!f) return '';
+    const det = this.casaDetalle();
+    if (det?.codigoCasa === f.codigoCasa && det.descripcion?.trim()) {
+      return det.descripcion.trim();
+    }
+    return (f.descripcion ?? '').trim() || 'Sin descripción en este dispositivo.';
+  }
+
+  protected fichaCupos(
+    campo:
+      | 'numeroDormitorios'
+      | 'numeroBanos'
+      | 'numeroCocinas'
+      | 'numeroComedores'
+      | 'plazasGaraje'
+  ): string {
+    const f = this.fichaCasaCatalogo();
+    if (!f) return '—';
+    const det = this.casaDetalle();
+    if (det?.codigoCasa === f.codigoCasa) {
+      const v = det[campo];
+      return String(v ?? '—');
+    }
+    const v = f[campo];
+    return v != null && Number.isFinite(v) ? String(v) : '—';
+  }
+
   protected etiquetaPaquete(p: PaqueteAlquilerResponse): string {
     const tipo =
       p.tipoAlquiler === TipoAlquiler.CASA_COMPLETA
@@ -387,6 +493,23 @@ export class ClienteDashboardComponent {
       [MetodoPago.EFECTIVO]: 'Efectivo',
     };
     return map[m] ?? String(m);
+  }
+
+  /** Solo el paquete «por habitaciones» permite elegir dormitorios en la reserva. */
+  protected mostrarSeleccionDormitoriosReserva(): boolean {
+    const id = this.reservaForm.getRawValue().paqueteId;
+    if (!id) return false;
+    const p = this.paquetes().find((x) => x.idPaquete === id);
+    return p?.tipoAlquiler === TipoAlquiler.POR_HABITACIONES;
+  }
+
+  private setPagoFeedback(tipo: 'error' | 'success', texto: string) {
+    this.pagoMensaje.set({ tipo, texto });
+    setTimeout(() =>
+      document
+        .getElementById('pago-feedback')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    );
   }
 
   protected seleccionarPaquete(id: number) {
@@ -414,6 +537,8 @@ export class ClienteDashboardComponent {
     if (this.loadingReserva()) return false;
     if (this.codigoCasa() == null) return false;
     if (this.paquetes().length === 0) return false;
+    const tel = this.reservaForm.get('telefonoContacto');
+    if (!tel?.valid) return false;
     return this.reservaForm.valid;
   }
 
@@ -461,9 +586,14 @@ export class ClienteDashboardComponent {
         this.upsertCatalogo({
           codigoCasa: v,
           poblacion: nombre,
-          descripcion: casaLocal?.descripcion,
+          descripcion: local?.descripcion ?? casaLocal?.descripcion,
           previewUrl: casaLocal?.fotos?.[0]?.url,
           fotos: casaLocal?.fotos,
+          numeroDormitorios: local?.numeroDormitorios,
+          numeroBanos: local?.numeroBanos,
+          numeroCocinas: local?.numeroCocinas,
+          numeroComedores: local?.numeroComedores,
+          plazasGaraje: local?.plazasGaraje,
         });
         this.success.set(`Datos cargados para ${nombre}.`);
       },
@@ -551,9 +681,13 @@ export class ClienteDashboardComponent {
       paqueteId: r.paqueteId,
     };
     const ids = this.selectedDormIds();
-    if (ids.length > 0) body.dormitoriosIds = ids;
-    const tel = r.telefonoContacto?.trim();
-    if (tel) body.telefonoContacto = tel;
+    if (
+      ids.length > 0 &&
+      this.mostrarSeleccionDormitoriosReserva()
+    ) {
+      body.dormitoriosIds = ids;
+    }
+    body.telefonoContacto = r.telefonoContacto.trim();
 
     this.reservaService.crearReserva(body).subscribe({
       next: (res) => {
@@ -572,8 +706,8 @@ export class ClienteDashboardComponent {
     });
   }
 
-  protected cargarInfoPago() {
-    this.clearMessages();
+  protected cargarInfoPago(opts?: { preserveBanner?: boolean }) {
+    if (!opts?.preserveBanner) this.pagoMensaje.set(null);
     const id = this.pagoForm.getRawValue().reservaId;
     if (id < 1) return;
     this.loadingPagos.set(true);
@@ -585,13 +719,13 @@ export class ClienteDashboardComponent {
       error: (err: HttpErrorResponse) => {
         this.loadingPagos.set(false);
         this.pagoInfo.set(null);
-        this.error.set(readApiError(err));
+        this.setPagoFeedback('error', readApiError(err));
       },
     });
   }
 
-  protected listarPagosReserva() {
-    this.clearMessages();
+  protected listarPagosReserva(opts?: { preserveBanner?: boolean }) {
+    if (!opts?.preserveBanner) this.pagoMensaje.set(null);
     const id = this.pagoForm.getRawValue().reservaId;
     if (id < 1) return;
     this.loadingPagos.set(true);
@@ -603,13 +737,13 @@ export class ClienteDashboardComponent {
       error: (err: HttpErrorResponse) => {
         this.loadingPagos.set(false);
         this.pagosLista.set([]);
-        this.error.set(readApiError(err));
+        this.setPagoFeedback('error', readApiError(err));
       },
     });
   }
 
   protected registrarPago() {
-    this.clearMessages();
+    this.pagoMensaje.set(null);
     if (this.pagoForm.invalid) {
       this.pagoForm.markAllAsTouched();
       return;
@@ -622,18 +756,18 @@ export class ClienteDashboardComponent {
         monto: p.monto,
         metodoPago: p.metodoPago,
         fechaPago: p.fechaPago,
-        confirmado: p.confirmado,
+        confirmado: true,
       })
       .subscribe({
         next: () => {
           this.loadingPagos.set(false);
-          this.success.set('Pago registrado correctamente');
-          this.listarPagosReserva();
-          this.cargarInfoPago();
+          this.setPagoFeedback('success', 'Pago registrado correctamente.');
+          this.listarPagosReserva({ preserveBanner: true });
+          this.cargarInfoPago({ preserveBanner: true });
         },
         error: (err: HttpErrorResponse) => {
           this.loadingPagos.set(false);
-          this.error.set(readApiError(err));
+          this.setPagoFeedback('error', readApiError(err));
         },
       });
   }
@@ -646,5 +780,6 @@ export class ClienteDashboardComponent {
   protected clearMessages() {
     this.error.set(null);
     this.success.set(null);
+    this.pagoMensaje.set(null);
   }
 }
