@@ -746,6 +746,12 @@
   letter-spacing: -0.02em;
 }
 
+.cli__pago-ajuste {
+  margin: -0.35rem 0 0.75rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
 .cli__pago-stats {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));

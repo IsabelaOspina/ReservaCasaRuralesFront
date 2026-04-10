@@ -30,13 +30,6 @@
     </p>
   }
 
-  @if (error(); as e) {
-    <p class="cli__alert cli__alert--err" role="alert">{{ e }}</p>
-  }
-  @if (success(); as s) {
-    <p class="cli__alert cli__alert--ok" role="status">{{ s }}</p>
-  }
-
   <div class="cli__layout">
     <aside class="cli__sidebar" aria-label="Navegación">
       <nav class="cli__nav">
@@ -88,6 +81,18 @@
             <p class="cli__active-hint">Casa activa: <strong>{{ nombreCasaMostrar() }}</strong></p>
           }
         </div>
+
+        @if (msgCasas(); as mc) {
+          <p
+            id="cli-feedback-casas"
+            class="cli__alert"
+            [class.cli__alert--err]="mc.tipo === 'err'"
+            [class.cli__alert--ok]="mc.tipo === 'ok'"
+            role="alert"
+          >
+            {{ mc.texto }}
+          </p>
+        }
 
         @if (loadingListadoCasas()) {
           <p class="cli__muted cli__loading-inline">Cargando casas…</p>
@@ -171,6 +176,17 @@
       <div class="cli__two-col" id="sec-disponibilidad">
         <section class="cli__card">
           <h2 class="cli__h2"><span class="cli__num">2</span> Disponibilidad</h2>
+          @if (msgDisp(); as md) {
+            <p
+              id="cli-feedback-disp"
+              class="cli__alert"
+              [class.cli__alert--err]="md.tipo === 'err'"
+              [class.cli__alert--ok]="md.tipo === 'ok'"
+              role="alert"
+            >
+              {{ md.texto }}
+            </p>
+          }
           <form [formGroup]="dispForm" (ngSubmit)="verificarDisponibilidad()">
             <div class="cli__grid2">
               <label class="cli__field">
@@ -282,6 +298,17 @@
       <!-- 5. Reserva -->
       <section class="cli__card" id="sec-reserva">
         <h2 class="cli__h2"><span class="cli__num">5</span> Nueva reserva</h2>
+        @if (msgReserva(); as mr) {
+          <p
+            id="cli-feedback-reserva"
+            class="cli__alert"
+            [class.cli__alert--err]="mr.tipo === 'err'"
+            [class.cli__alert--ok]="mr.tipo === 'ok'"
+            role="alert"
+          >
+            {{ mr.texto }}
+          </p>
+        }
         <form [formGroup]="reservaForm" (ngSubmit)="crearReserva()">
           <div class="cli__grid2">
             <label class="cli__field">
@@ -379,6 +406,7 @@
               type="number"
               min="1"
               formControlName="reservaId"
+              placeholder="Ej. 14"
               [class.cli__input--invalid]="fieldState('pago', 'reservaId') === 'invalid'"
               [class.cli__input--valid]="fieldState('pago', 'reservaId') === 'valid'"
             />
@@ -407,6 +435,13 @@
           @if (pagoInfo(); as info) {
             <div class="cli__pago-summary" role="region" aria-label="Resumen de pago">
               <h3 class="cli__pago-summary__title">Resumen de importes</h3>
+              @if (pagoInfoFueAjustado()) {
+                <p class="cli__muted cli__pago-ajuste">
+                  Importes alineados con el total calculado al crear la reserva (noches y habitaciones en este
+                  navegador). Si el importe del servidor coincidía solo con el precio base del paquete, aquí se muestra
+                  el total coherente con tu selección.
+                </p>
+              }
               <div class="cli__pago-stats">
                 <div class="cli__pago-stat">
                   <span class="cli__pago-stat__label">Total a pagar</span>

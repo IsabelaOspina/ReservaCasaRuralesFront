@@ -27,14 +27,23 @@ import { PagoResponse } from '../../DTO/pago-response';
 import { FotoResponse } from '../../DTO/Foto-response';
 import {
   PagoInfoResponse,
+  PagoInfoResponseAmigable,
   transformPagoInfoResponse,
 } from '../../DTO/pagoinfo-response';
 import { TipoAlquiler } from '../../DTO/paquete-request';
 
 const LS_CODIGO = 'cliente_codigo_casa';
 const SS_RESERVA = 'cliente_ultima_reserva';
+/** Total esperado al crear la reserva (habitaciones × noches); alinea resumen de pagos si el API solo devuelve precio base. */
+const SS_PAGO_CALC_PREFIX = 'cliente_pago_calc_v1_';
+
+interface ClienteCalculoPagoReserva {
+  total: number;
+  porNoche: number;
+  noches: number;
+  paqueteId: number;
+}
 const LS_CATALOGO = 'cliente_catalogo_casas';
-const LS_PROPIETARIO_CASAS = 'propietario_casas';
 /** Teléfono guardado al registrar como cliente (misma sesión / dispositivo). */
 const LS_CLIENTE_TEL = 'cliente_telefono_registro';
 
@@ -90,12 +99,22 @@ export class ClienteDashboardComponent {
   protected readonly pagoInfo = signal(
     null as ReturnType<typeof transformPagoInfoResponse> | null
   );
+  /** True si el resumen de pagos se escaló con el total calculado al reservar (mismo navegador). */
+  protected readonly pagoInfoFueAjustado = signal(false);
   protected readonly pagosLista = signal<PagoResponse[]>([]);
   protected readonly loadingPagos = signal(false);
 
-  protected readonly error = signal<string | null>(null);
-  protected readonly success = signal<string | null>(null);
-  /** Avisos solo de la sección Pagos (no se muestran en la barra superior). */
+  /** Mensajes junto a la sección que dispara la acción (no en la cabecera global). */
+  protected readonly msgCasas = signal<{ tipo: 'ok' | 'err'; texto: string } | null>(
+    null
+  );
+  protected readonly msgDisp = signal<{ tipo: 'ok' | 'err'; texto: string } | null>(
+    null
+  );
+  protected readonly msgReserva = signal<{ tipo: 'ok' | 'err'; texto: string } | null>(
+    null
+  );
+  /** Avisos solo de la sección Pagos. */
   protected readonly pagoMensaje = signal<{
     tipo: 'error' | 'success';
     texto: string;
@@ -132,8 +151,8 @@ export class ClienteDashboardComponent {
     telefonoContacto: ['', this.telefonoContactoValidators],
   });
 
-  protected readonly pagoForm = this.fb.nonNullable.group({
-    reservaId: [1, [Validators.required, Validators.min(1)]],
+  protected readonly pagoForm = this.fb.group({
+    reservaId: [null as number | null, [Validators.required, Validators.min(1)]],
     monto: [0, [Validators.required, Validators.min(0.01)]],
     metodoPago: [MetodoPago.TRANSFERENCIA as MetodoPago, Validators.required],
     fechaPago: ['', Validators.required],
@@ -159,8 +178,9 @@ export class ClienteDashboardComponent {
     if (r) {
       try {
         this.ultimaReserva.set(JSON.parse(r) as ReservaResponse);
-        if (this.ultimaReserva()?.id) {
-          this.pagoForm.patchValue({ reservaId: this.ultimaReserva()!.id });
+        const rid = this.ultimaReserva()?.id;
+        if (rid != null && rid >= 1) {
+          this.pagoForm.patchValue({ reservaId: rid });
         }
       } catch {
         /* ignore */
@@ -228,38 +248,52 @@ export class ClienteDashboardComponent {
     this.refrescarListadoCompleto();
   }
 
+  /**
+   * Casas guardadas localmente por cualquier sesión de propietario en este navegador
+   * (clave `propietario_casas` o `propietario_casas_<usuario>`). Solo afecta al catálogo cliente;
+   * el panel propietario usa solo la clave de su perfil.
+   */
   private readPropietarioCasasLs(): CasaClienteCatalogo[] {
+    const byCodigo = new Map<number, CasaClienteCatalogo>();
     try {
-      const raw = localStorage.getItem(LS_PROPIETARIO_CASAS);
-      if (!raw) return [];
-      const arr = JSON.parse(raw) as {
-        codigoCasa: number;
-        poblacion: string;
-        descripcion?: string;
-        previewUrl?: string;
-        fotos?: FotoResponse[];
-        numeroDormitorios?: number;
-        numeroBanos?: number;
-        numeroCocinas?: number;
-        numeroComedores?: number;
-        plazasGaraje?: number;
-      }[];
-      if (!Array.isArray(arr)) return [];
-      return arr.map((x) => ({
-        codigoCasa: x.codigoCasa,
-        poblacion: (x.poblacion ?? '').trim() || `Casa ${x.codigoCasa}`,
-        descripcion: x.descripcion,
-        previewUrl: x.previewUrl,
-        fotos: x.fotos,
-        numeroDormitorios: x.numeroDormitorios,
-        numeroBanos: x.numeroBanos,
-        numeroCocinas: x.numeroCocinas,
-        numeroComedores: x.numeroComedores,
-        plazasGaraje: x.plazasGaraje,
-      }));
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key || !key.startsWith('propietario_casas')) continue;
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+        const arr = JSON.parse(raw) as {
+          codigoCasa: number;
+          poblacion: string;
+          descripcion?: string;
+          previewUrl?: string;
+          fotos?: FotoResponse[];
+          numeroDormitorios?: number;
+          numeroBanos?: number;
+          numeroCocinas?: number;
+          numeroComedores?: number;
+          plazasGaraje?: number;
+        }[];
+        if (!Array.isArray(arr)) continue;
+        for (const x of arr) {
+          if (x?.codigoCasa == null || !Number.isFinite(x.codigoCasa)) continue;
+          byCodigo.set(x.codigoCasa, {
+            codigoCasa: x.codigoCasa,
+            poblacion: (x.poblacion ?? '').trim() || `Casa ${x.codigoCasa}`,
+            descripcion: x.descripcion,
+            previewUrl: x.previewUrl,
+            fotos: x.fotos,
+            numeroDormitorios: x.numeroDormitorios,
+            numeroBanos: x.numeroBanos,
+            numeroCocinas: x.numeroCocinas,
+            numeroComedores: x.numeroComedores,
+            plazasGaraje: x.plazasGaraje,
+          });
+        }
+      }
     } catch {
       return [];
     }
+    return Array.from(byCodigo.values()).sort((a, b) => a.codigoCasa - b.codigoCasa);
   }
 
   private coalesceNumCat(a?: number, b?: number): number | undefined {
@@ -405,7 +439,7 @@ export class ClienteDashboardComponent {
    * Galería desde tarjeta: detalle en memoria → GET (cuando exista) → miniatura del catálogo local.
    */
   protected abrirGaleriaCasa(c: CasaClienteCatalogo) {
-    this.error.set(null);
+    this.msgCasas.set(null);
     const detalle = this.casaDetalle();
     if (
       this.codigoCasa() === c.codigoCasa &&
@@ -426,7 +460,7 @@ export class ClienteDashboardComponent {
       this.modalGaleriaAbierta.set(true);
       return;
     }
-    this.error.set('No hay fotos para esta casa en este dispositivo.');
+    this.setMsgCasas('err', 'No hay fotos para esta casa en este dispositivo.');
   }
 
   protected cerrarGaleria() {
@@ -547,13 +581,119 @@ export class ClienteDashboardComponent {
     return { porNoche, total };
   }
 
+  private scrollToFeedback(id: string) {
+    setTimeout(
+      () =>
+        document
+          .getElementById(id)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }),
+      0
+    );
+  }
+
+  private setMsgCasas(tipo: 'ok' | 'err', texto: string) {
+    this.msgCasas.set({ tipo, texto });
+    this.scrollToFeedback('cli-feedback-casas');
+  }
+
+  private setMsgDisp(tipo: 'ok' | 'err', texto: string) {
+    this.msgDisp.set({ tipo, texto });
+    this.scrollToFeedback('cli-feedback-disp');
+  }
+
+  private setMsgReserva(tipo: 'ok' | 'err', texto: string) {
+    this.msgReserva.set({ tipo, texto });
+    this.scrollToFeedback('cli-feedback-reserva');
+  }
+
+  private pagoCalcStorageKey(reservaId: number): string {
+    return SS_PAGO_CALC_PREFIX + reservaId;
+  }
+
+  private guardarCalculoPagoReserva(
+    res: ReservaResponse,
+    est: { porNoche: number; total: number }
+  ): void {
+    try {
+      const payload: ClienteCalculoPagoReserva = {
+        total: est.total,
+        porNoche: est.porNoche,
+        noches: res.noches,
+        paqueteId: res.paqueteId,
+      };
+      sessionStorage.setItem(this.pagoCalcStorageKey(res.id), JSON.stringify(payload));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  private leerCalculoPagoReserva(reservaId: number): ClienteCalculoPagoReserva | null {
+    try {
+      const raw = sessionStorage.getItem(this.pagoCalcStorageKey(reservaId));
+      if (!raw) return null;
+      const o = JSON.parse(raw) as ClienteCalculoPagoReserva;
+      if (!o || !(o.total > 0)) return null;
+      return o;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Si el backend devuelve solo el precio base del paquete (p. ej. 100 €) pero en pantalla
+   * calculamos 300 € (3 noches o habitaciones), escalamos total/anticipo/saldo de forma proporcional.
+   */
+  private combinarPagoInfoApiConCliente(
+    reservaId: number,
+    api: PagoInfoResponseAmigable
+  ): { info: PagoInfoResponseAmigable; ajustado: boolean } {
+    const snap = this.leerCalculoPagoReserva(reservaId);
+    if (!snap || !(snap.total > 0)) {
+      return { info: api, ajustado: false };
+    }
+    const base = api.totalAPagar;
+    if (base > 0 && Math.abs(snap.total - base) < 0.02) {
+      return { info: api, ajustado: false };
+    }
+    if (!(base > 0)) {
+      return {
+        info: {
+          ...api,
+          totalAPagar: snap.total,
+          anticipoReserva: Math.round(snap.total * 0.2 * 100) / 100,
+          saldoRestante: snap.total,
+        },
+        ajustado: true,
+      };
+    }
+    const k = snap.total / base;
+    return {
+      info: {
+        totalAPagar: snap.total,
+        anticipoReserva: Math.round(api.anticipoReserva * k * 100) / 100,
+        saldoRestante: Math.round(api.saldoRestante * k * 100) / 100,
+        banco: api.banco,
+        numeroCuenta: api.numeroCuenta,
+      },
+      ajustado: true,
+    };
+  }
+
+  /** Tras crear reserva: vacía fechas/disp y sincroniza formularios para no arrastrar la reserva anterior. */
+  private resetFormularioTrasReservaExitosa(): void {
+    this.selectedDormIds.set([]);
+    this.disponibilidadResult.set(null);
+    this.reservaForm.patchValue({ fechaInicio: '', noches: 3 });
+    this.dispForm.patchValue({ fechaInicio: '', noches: 3 });
+    this.reservaForm.markAsPristine();
+    this.reservaForm.markAsUntouched();
+    this.dispForm.markAsPristine();
+    this.dispForm.markAsUntouched();
+  }
+
   private setPagoFeedback(tipo: 'error' | 'success', texto: string) {
     this.pagoMensaje.set({ tipo, texto });
-    setTimeout(() =>
-      document
-        .getElementById('pago-feedback')
-        ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-    );
+    this.scrollToFeedback('pago-feedback');
   }
 
   protected seleccionarPaquete(id: number) {
@@ -601,11 +741,10 @@ export class ClienteDashboardComponent {
   }
 
   protected cargarDatosCasa(raw?: number) {
-    this.error.set(null);
-    this.success.set(null);
+    this.msgCasas.set(null);
     const v = raw ?? this.codigoForm.getRawValue().codigo;
     if (v < 1) {
-      this.error.set('Introduce un código de casa válido');
+      this.setMsgCasas('err', 'Introduce un código de casa válido');
       return;
     }
     this.loadingPaquetes.set(true);
@@ -642,11 +781,11 @@ export class ClienteDashboardComponent {
           numeroComedores: local?.numeroComedores,
           plazasGaraje: local?.plazasGaraje,
         });
-        this.success.set(`Datos cargados para ${nombre}.`);
+        this.setMsgCasas('ok', `Datos cargados para ${nombre}.`);
       },
       error: (err: HttpErrorResponse) => {
         this.loadingPaquetes.set(false);
-        this.error.set(readApiError(err));
+        this.setMsgCasas('err', readApiError(err));
       },
     });
   }
@@ -665,7 +804,7 @@ export class ClienteDashboardComponent {
     this.clearMessages();
     const casa = this.codigoCasa();
     if (casa == null) {
-      this.error.set('Selecciona o carga una casa primero');
+      this.setMsgCasas('err', 'Selecciona o carga una casa primero');
       return;
     }
     if (this.dispForm.invalid) {
@@ -696,7 +835,7 @@ export class ClienteDashboardComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.loadingDisp.set(false);
-          this.error.set(readApiError(err));
+          this.setMsgDisp('err', readApiError(err));
         },
       });
   }
@@ -705,7 +844,7 @@ export class ClienteDashboardComponent {
     this.clearMessages();
     const casa = this.codigoCasa();
     if (casa == null) {
-      this.error.set('Selecciona una casa primero');
+      this.setMsgReserva('err', 'Selecciona una casa primero');
       return;
     }
     if (this.reservaForm.invalid) {
@@ -713,7 +852,10 @@ export class ClienteDashboardComponent {
       return;
     }
     if (this.mostrarSeleccionDormitoriosReserva() && this.selectedDormIds().length === 0) {
-      this.error.set('Selecciona al menos 1 dormitorio para el paquete por habitaciones.');
+      this.setMsgReserva(
+        'err',
+        'Selecciona al menos 1 dormitorio para el paquete por habitaciones.'
+      );
       return;
     }
     this.loadingReserva.set(true);
@@ -743,18 +885,23 @@ export class ClienteDashboardComponent {
     this.reservaService.crearReserva(body).subscribe({
       next: (res) => {
         this.loadingReserva.set(false);
+        const est = this.precioReservaEstimado();
         this.ultimaReserva.set(res);
         sessionStorage.setItem(SS_RESERVA, JSON.stringify(res));
         this.pagoForm.patchValue({ reservaId: res.id });
-        this.success.set(
+        if (est && est.total > 0) {
+          this.guardarCalculoPagoReserva(res, est);
+        }
+        this.resetFormularioTrasReservaExitosa();
+        this.setMsgReserva(
+          'ok',
           `Reserva creada con ID ${res.id}. Fecha límite de pago: ${res.fechaLimitePago}`
         );
-        this.selectedDormIds.set([]);
-        this.reservaForm.patchValue({ fechaInicio: '', noches: 3 });
+        this.cargarInfoPago({ preserveBanner: true });
       },
       error: (err: HttpErrorResponse) => {
         this.loadingReserva.set(false);
-        this.error.set(readApiError(err));
+        this.setMsgReserva('err', readApiError(err));
       },
     });
   }
@@ -762,16 +909,23 @@ export class ClienteDashboardComponent {
   protected cargarInfoPago(opts?: { preserveBanner?: boolean }) {
     if (!opts?.preserveBanner) this.pagoMensaje.set(null);
     const id = this.pagoForm.getRawValue().reservaId;
-    if (id < 1) return;
+    if (id == null || id < 1) {
+      this.setPagoFeedback('error', 'Indica un ID de reserva válido.');
+      return;
+    }
     this.loadingPagos.set(true);
     this.pagoService.obtenerInfoPago(id).subscribe({
       next: (raw: PagoInfoResponse) => {
         this.loadingPagos.set(false);
-        this.pagoInfo.set(transformPagoInfoResponse(raw));
+        const base = transformPagoInfoResponse(raw);
+        const { info, ajustado } = this.combinarPagoInfoApiConCliente(id, base);
+        this.pagoInfo.set(info);
+        this.pagoInfoFueAjustado.set(ajustado);
       },
       error: (err: HttpErrorResponse) => {
         this.loadingPagos.set(false);
         this.pagoInfo.set(null);
+        this.pagoInfoFueAjustado.set(false);
         this.setPagoFeedback('error', readApiError(err));
       },
     });
@@ -780,7 +934,10 @@ export class ClienteDashboardComponent {
   protected listarPagosReserva(opts?: { preserveBanner?: boolean }) {
     if (!opts?.preserveBanner) this.pagoMensaje.set(null);
     const id = this.pagoForm.getRawValue().reservaId;
-    if (id < 1) return;
+    if (id == null || id < 1) {
+      this.setPagoFeedback('error', 'Indica un ID de reserva válido.');
+      return;
+    }
     this.loadingPagos.set(true);
     this.pagoService.obtenerPagosPorReserva(id).subscribe({
       next: (list) => {
@@ -802,32 +959,66 @@ export class ClienteDashboardComponent {
       return;
     }
     const p = this.pagoForm.getRawValue();
+    const reservaId = p.reservaId;
+    const monto = p.monto;
+    const metodoPago = p.metodoPago;
+    const fechaPago = p.fechaPago;
+    if (
+      reservaId == null ||
+      reservaId < 1 ||
+      monto == null ||
+      metodoPago == null ||
+      !fechaPago?.trim()
+    ) {
+      this.pagoForm.markAllAsTouched();
+      return;
+    }
     const info = this.pagoInfo();
-    if (info && Number.isFinite(info.totalAPagar) && p.monto > info.totalAPagar) {
+    if (info && Number.isFinite(info.totalAPagar) && monto > info.totalAPagar) {
       this.setPagoFeedback('error', 'El pago excede el total de la reserva');
       return;
     }
     this.loadingPagos.set(true);
     this.pagoService
       .registrarPago({
-        reservaId: p.reservaId,
-        monto: p.monto,
-        metodoPago: p.metodoPago,
-        fechaPago: p.fechaPago,
+        reservaId,
+        monto,
+        metodoPago,
+        fechaPago,
         confirmado: true,
       })
       .subscribe({
         next: () => {
           this.loadingPagos.set(false);
           this.setPagoFeedback('success', 'Pago registrado correctamente.');
+          const rid = reservaId;
           const hoy = new Date().toISOString().slice(0, 10);
+
+          this.pagoService.obtenerPagosPorReserva(rid).subscribe({
+            next: (list) => this.pagosLista.set(list),
+            error: () => this.pagosLista.set([]),
+          });
+          this.pagoService.obtenerInfoPago(rid).subscribe({
+            next: (raw: PagoInfoResponse) => {
+              const base = transformPagoInfoResponse(raw);
+              const { info, ajustado } = this.combinarPagoInfoApiConCliente(rid, base);
+              this.pagoInfo.set(info);
+              this.pagoInfoFueAjustado.set(ajustado);
+            },
+            error: () => {
+              this.pagoInfo.set(null);
+              this.pagoInfoFueAjustado.set(false);
+            },
+          });
+
           this.pagoForm.patchValue({
+            reservaId: rid,
             monto: 0,
             metodoPago: MetodoPago.TRANSFERENCIA,
             fechaPago: hoy,
           });
-          this.listarPagosReserva({ preserveBanner: true });
-          this.cargarInfoPago({ preserveBanner: true });
+          this.pagoForm.markAsPristine();
+          this.pagoForm.markAsUntouched();
         },
         error: (err: HttpErrorResponse) => {
           this.loadingPagos.set(false);
@@ -842,8 +1033,9 @@ export class ClienteDashboardComponent {
   }
 
   protected clearMessages() {
-    this.error.set(null);
-    this.success.set(null);
+    this.msgCasas.set(null);
+    this.msgDisp.set(null);
+    this.msgReserva.set(null);
     this.pagoMensaje.set(null);
   }
 }

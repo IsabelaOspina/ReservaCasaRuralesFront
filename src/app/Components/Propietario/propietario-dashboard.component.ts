@@ -24,6 +24,7 @@ import { PaqueteAlquilerService } from '../../Services/paquete.service';
 import { DormitorioService } from '../../Services/dormitorio.service';
 import { CocinaService } from '../../Services/cocina.service';
 import { readApiError } from '../../core/http-error.util';
+import { propietarioCasasLocalStorageKey } from '../../core/auth/propietario-storage.util';
 import { CasaRuralRequestDTO } from '../../DTO/CasaRural-request';
 import { CasaRuralResponse } from '../../DTO/CasaRural-response';
 import { FotoResponse } from '../../DTO/Foto-response';
@@ -32,8 +33,6 @@ import { TipoAlquiler } from '../../DTO/paquete-request';
 import { DormitorioResponse } from '../../DTO/Dormitorio-response';
 import { CocinaResponse } from '../../DTO/Cocina-response';
 import { TipoCama } from '../../DTO/Dormitorio-request';
-
-const LS_CASAS = 'propietario_casas';
 
 function rangoFechasPaquete(): ValidatorFn {
   return (group: AbstractControl): ValidationErrors | null => {
@@ -354,9 +353,13 @@ export class PropietarioDashboardComponent {
     }
   }
 
+  private lsCasasKey(): string {
+    return propietarioCasasLocalStorageKey();
+  }
+
   private readCasasLs(): CasaRegistradaLocal[] {
     try {
-      const raw = localStorage.getItem(LS_CASAS);
+      const raw = localStorage.getItem(this.lsCasasKey());
       return raw ? (JSON.parse(raw) as CasaRegistradaLocal[]) : [];
     } catch {
       return [];
@@ -364,7 +367,7 @@ export class PropietarioDashboardComponent {
   }
 
   private persistCasas(list: CasaRegistradaLocal[]) {
-    localStorage.setItem(LS_CASAS, JSON.stringify(list));
+    localStorage.setItem(this.lsCasasKey(), JSON.stringify(list));
     this.casasLocales.set(list);
   }
 
