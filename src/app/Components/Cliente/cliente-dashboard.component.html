@@ -263,7 +263,6 @@
       <section class="cli__card" id="sec-dorms">
         <h2 class="cli__h2"><span class="cli__num">4</span> Dormitorios</h2>
         @if (mostrarSeleccionDormitoriosReserva()) {
-          <p class="cli__lead cli__lead--tight">Elige habitaciones solo para reservas con paquete «Por habitaciones».</p>
           @if (dormitorios().length === 0) {
             <p class="cli__muted">No hay dormitorios disponibles para esta casa.</p>
           } @else {
@@ -272,26 +271,19 @@
                 <li>
                   <label class="cli__dorm">
                     <input
-                      type="checkbox"
-                      [checked]="isDormSelected(d.idDormitorio)"
-                      (change)="toggleDorm(d.idDormitorio)"
+                      type="radio"
+                      name="dorm-reserva"
+                      [checked]="isDormitorioReservaSeleccionado(d.idDormitorio)"
+                      (change)="seleccionarDormitorioReserva(d.idDormitorio)"
                     />
                     <span>
                       <strong>{{ d.nombre }}</strong> — {{ d.tipoCama }}, {{ d.numeroCamas }} cama(s)
-                      <span class="cli__muted">
-                        ({{ (factorDormitorio(d) * 100) | number: '1.0-0' }}% del precio base)
-                      </span>
                     </span>
                   </label>
                 </li>
               }
             </ul>
           }
-        } @else {
-          <p class="cli__muted">
-            La elección de habitaciones no aplica para paquetes de <strong>casa completa</strong> u otros tipos; solo
-            cuando el paquete sea <strong>por habitaciones</strong>.
-          </p>
         }
       </section>
 
@@ -363,11 +355,9 @@
           </button>
           @if (precioReservaEstimado(); as est) {
             <p class="cli__muted cli__price-est">
-              Estimado: <strong>{{ est.porNoche | number: '1.2-2' }} €</strong> / noche ·
-              Total: <strong>{{ est.total | number: '1.2-2' }} €</strong>
+              Paquete: <strong>{{ est.precioPaquetePorNoche | number: '1.2-2' }} €</strong> / noche · Total estimado:
+              <strong>{{ est.total | number: '1.2-2' }} €</strong>
             </p>
-          } @else if (mostrarSeleccionDormitoriosReserva() && selectedDormIds().length === 0) {
-            <p class="cli__muted cli__price-est">Selecciona dormitorios para calcular el total.</p>
           }
         </form>
         @if (ultimaReserva(); as ur) {
@@ -396,9 +386,6 @@
             {{ pm.texto }}
           </div>
         }
-        <p class="cli__pagos-intro">
-          Indica el ID de la reserva y consulta importes y datos bancarios, o revisa los pagos ya registrados.
-        </p>
         <form [formGroup]="pagoForm" class="cli__pago-form" (ngSubmit)="registrarPago()">
           <label class="cli__field">
             <span class="cli__label">Reserva ID</span>
@@ -435,13 +422,6 @@
           @if (pagoInfo(); as info) {
             <div class="cli__pago-summary" role="region" aria-label="Resumen de pago">
               <h3 class="cli__pago-summary__title">Resumen de importes</h3>
-              @if (pagoInfoFueAjustado()) {
-                <p class="cli__muted cli__pago-ajuste">
-                  Importes alineados con el total calculado al crear la reserva (noches y habitaciones en este
-                  navegador). Si el importe del servidor coincidía solo con el precio base del paquete, aquí se muestra
-                  el total coherente con tu selección.
-                </p>
-              }
               <div class="cli__pago-stats">
                 <div class="cli__pago-stat">
                   <span class="cli__pago-stat__label">Total a pagar</span>
@@ -453,7 +433,7 @@
                 </div>
                 <div class="cli__pago-stat">
                   <span class="cli__pago-stat__label">Saldo restante</span>
-                  <span class="cli__pago-stat__value">{{ info.saldoRestante | number: '1.2-2' }} €</span>
+                  <span class="cli__pago-stat__value">{{ saldoRestanteMostrado(info) | number: '1.2-2' }} €</span>
                 </div>
               </div>
               <div class="cli__pago-bank">
@@ -519,9 +499,16 @@
               <input
                 type="date"
                 formControlName="fechaPago"
+                [attr.min]="fechaMinimaPago()"
                 [class.cli__input--invalid]="fieldState('pago', 'fechaPago') === 'invalid'"
                 [class.cli__input--valid]="fieldState('pago', 'fechaPago') === 'valid'"
               />
+              @if (
+                pagoForm.get('fechaPago')?.hasError('fechaPagoPasada') &&
+                (pagoForm.get('fechaPago')?.touched || pagoForm.get('fechaPago')?.dirty)
+              ) {
+                <span class="cli__err">La fecha no puede ser anterior a hoy.</span>
+              }
             </label>
           </div>
           <button type="submit" class="cli__btn cli__btn--primary" [disabled]="!canRegistrarPago()">

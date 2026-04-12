@@ -700,13 +700,6 @@
   color: #14532d;
 }
 
-.cli__pagos-intro {
-  margin: 0 0 1rem;
-  font-size: 0.86rem;
-  line-height: 1.5;
-  color: var(--text-700);
-}
-
 .cli__pago-form {
   display: flex;
   flex-direction: column;

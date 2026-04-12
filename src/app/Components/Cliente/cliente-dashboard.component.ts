@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
-import { forkJoin } from 'rxjs';
+import { catchError, forkJoin, of } from 'rxjs';
 import {
   AbstractControl,
   FormBuilder,
@@ -21,28 +21,32 @@ import { CasaRuralResponse } from '../../DTO/CasaRural-response';
 import { MetodoPago } from '../../DTO/pago-request';
 import { PaqueteAlquilerResponse } from '../../DTO/paquete-response';
 import { DormitorioResponse } from '../../DTO/Dormitorio-response';
-import { TipoCama } from '../../DTO/Dormitorio-request';
 import { ReservaResponse } from '../../DTO/reserva-response';
 import { PagoResponse } from '../../DTO/pago-response';
 import { FotoResponse } from '../../DTO/Foto-response';
-import {
-  PagoInfoResponse,
-  PagoInfoResponseAmigable,
-  transformPagoInfoResponse,
-} from '../../DTO/pagoinfo-response';
+import { PagoInfoResponse, PagoInfoResponseAmigable, transformPagoInfoResponse } from '../../DTO/pagoinfo-response';
 import { TipoAlquiler } from '../../DTO/paquete-request';
+
+function hoyLocalISODate(): string {
+  const h = new Date();
+  const y = h.getFullYear();
+  const m = String(h.getMonth() + 1).padStart(2, '0');
+  const d = String(h.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function fechaPagoNoPasada(control: AbstractControl): { fechaPagoPasada: true } | null {
+  const v = control.value;
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v !== 'string') return { fechaPagoPasada: true };
+  const s = v.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return { fechaPagoPasada: true };
+  if (s < hoyLocalISODate()) return { fechaPagoPasada: true };
+  return null;
+}
 
 const LS_CODIGO = 'cliente_codigo_casa';
 const SS_RESERVA = 'cliente_ultima_reserva';
-/** Total esperado al crear la reserva (habitaciones × noches); alinea resumen de pagos si el API solo devuelve precio base. */
-const SS_PAGO_CALC_PREFIX = 'cliente_pago_calc_v1_';
-
-interface ClienteCalculoPagoReserva {
-  total: number;
-  porNoche: number;
-  noches: number;
-  paqueteId: number;
-}
 const LS_CATALOGO = 'cliente_catalogo_casas';
 /** Teléfono guardado al registrar como cliente (misma sesión / dispositivo). */
 const LS_CLIENTE_TEL = 'cliente_telefono_registro';
@@ -85,7 +89,8 @@ export class ClienteDashboardComponent {
   protected readonly loadingListadoCasas = signal(false);
   protected readonly paquetes = signal<PaqueteAlquilerResponse[]>([]);
   protected readonly dormitorios = signal<DormitorioResponse[]>([]);
-  protected readonly selectedDormIds = signal<number[]>([]);
+  /** Una sola habitación para paquete «por habitaciones». */
+  protected readonly selectedDormId = signal<number | null>(null);
 
   protected readonly loadingPaquetes = signal(false);
   protected readonly disponibilidadResult = signal<{ ok: boolean; msg: string } | null>(
@@ -99,8 +104,6 @@ export class ClienteDashboardComponent {
   protected readonly pagoInfo = signal(
     null as ReturnType<typeof transformPagoInfoResponse> | null
   );
-  /** True si el resumen de pagos se escaló con el total calculado al reservar (mismo navegador). */
-  protected readonly pagoInfoFueAjustado = signal(false);
   protected readonly pagosLista = signal<PagoResponse[]>([]);
   protected readonly loadingPagos = signal(false);
 
@@ -155,7 +158,7 @@ export class ClienteDashboardComponent {
     reservaId: [null as number | null, [Validators.required, Validators.min(1)]],
     monto: [0, [Validators.required, Validators.min(0.01)]],
     metodoPago: [MetodoPago.TRANSFERENCIA as MetodoPago, Validators.required],
-    fechaPago: ['', Validators.required],
+    fechaPago: ['', [Validators.required, fechaPagoNoPasada]],
   });
 
   protected readonly metodosPago = [
@@ -186,8 +189,7 @@ export class ClienteDashboardComponent {
         /* ignore */
       }
     }
-    const hoy = new Date().toISOString().slice(0, 10);
-    this.pagoForm.patchValue({ fechaPago: hoy });
+    this.pagoForm.patchValue({ fechaPago: hoyLocalISODate() });
 
     let telPref = localStorage.getItem(LS_CLIENTE_TEL) ?? '';
     if (!telPref) {
@@ -207,7 +209,7 @@ export class ClienteDashboardComponent {
     this.reservaForm.get('paqueteId')?.valueChanges.subscribe((pid) => {
       const p = this.paquetes().find((x) => x.idPaquete === pid);
       if (p?.tipoAlquiler !== TipoAlquiler.POR_HABITACIONES) {
-        this.selectedDormIds.set([]);
+        this.selectedDormId.set(null);
       }
     });
 
@@ -544,41 +546,21 @@ export class ClienteDashboardComponent {
     return this.paquetes().find((x) => x.idPaquete === id) ?? null;
   }
 
-  private dormitoriosSeleccionados(): DormitorioResponse[] {
-    const ids = new Set(this.selectedDormIds());
-    if (ids.size === 0) return [];
-    return this.dormitorios().filter((d) => ids.has(d.idDormitorio));
-  }
-
   /**
-   * Precio por noche de una habitación según tipo de cama.
-   * - SENCILLA: 1x
-   * - DOBLE: 1.25x (un poco más)
+   * `precioPaquetePorNoche`: tarifa del paquete (€/noche).
+   * `total`: precio del paquete × noches (una habitación; el tipo de cama no altera el importe).
    */
-  protected factorDormitorio(d: DormitorioResponse): number {
-    return d.tipoCama === TipoCama.DOBLE ? 1.25 : 1;
-  }
-
-  protected totalHabitacionesFactor(): number {
-    const sel = this.dormitoriosSeleccionados();
-    if (sel.length === 0) return 0;
-    return sel.reduce((acc, d) => acc + this.factorDormitorio(d), 0);
-  }
-
-  /** Estimación de precio (UI): para «por habitaciones» escala según habitaciones y tipo de cama. */
-  protected precioReservaEstimado(): { porNoche: number; total: number } | null {
+  protected precioReservaEstimado(): {
+    precioPaquetePorNoche: number;
+    total: number;
+  } | null {
     const p = this.paqueteSeleccionado();
     if (!p) return null;
     const noches = Number(this.reservaForm.getRawValue().noches) || 0;
     if (noches <= 0) return null;
-
-    let porNoche = Number(p.precio) || 0;
-    if (p.tipoAlquiler === TipoAlquiler.POR_HABITACIONES) {
-      const f = this.totalHabitacionesFactor();
-      porNoche = porNoche * (f > 0 ? f : 0);
-    }
-    const total = porNoche * noches;
-    return { porNoche, total };
+    const precioPaquetePorNoche = Number(p.precio) || 0;
+    const total = precioPaquetePorNoche * noches;
+    return { precioPaquetePorNoche, total };
   }
 
   private scrollToFeedback(id: string) {
@@ -606,85 +588,27 @@ export class ClienteDashboardComponent {
     this.scrollToFeedback('cli-feedback-reserva');
   }
 
-  private pagoCalcStorageKey(reservaId: number): string {
-    return SS_PAGO_CALC_PREFIX + reservaId;
-  }
-
-  private guardarCalculoPagoReserva(
-    res: ReservaResponse,
-    est: { porNoche: number; total: number }
-  ): void {
-    try {
-      const payload: ClienteCalculoPagoReserva = {
-        total: est.total,
-        porNoche: est.porNoche,
+  /**
+   * Tras crear reserva: limpia dormitorios/disponibilidad y alinea fechas, noches y paquete con la reserva guardada
+   * para que el «Total estimado» coincida con GET/POST pagos (mismos noches y paquete que en BD).
+   */
+  private resetFormularioTrasReservaExitosa(res?: ReservaResponse): void {
+    this.selectedDormId.set(null);
+    this.disponibilidadResult.set(null);
+    if (res) {
+      this.reservaForm.patchValue({
+        fechaInicio: res.fechaInicio,
         noches: res.noches,
         paqueteId: res.paqueteId,
-      };
-      sessionStorage.setItem(this.pagoCalcStorageKey(res.id), JSON.stringify(payload));
-    } catch {
-      /* ignore */
+      });
+      this.dispForm.patchValue({
+        fechaInicio: res.fechaInicio,
+        noches: res.noches,
+      });
+    } else {
+      this.reservaForm.patchValue({ fechaInicio: '', noches: 3 });
+      this.dispForm.patchValue({ fechaInicio: '', noches: 3 });
     }
-  }
-
-  private leerCalculoPagoReserva(reservaId: number): ClienteCalculoPagoReserva | null {
-    try {
-      const raw = sessionStorage.getItem(this.pagoCalcStorageKey(reservaId));
-      if (!raw) return null;
-      const o = JSON.parse(raw) as ClienteCalculoPagoReserva;
-      if (!o || !(o.total > 0)) return null;
-      return o;
-    } catch {
-      return null;
-    }
-  }
-
-  /**
-   * Si el backend devuelve solo el precio base del paquete (p. ej. 100 €) pero en pantalla
-   * calculamos 300 € (3 noches o habitaciones), escalamos total/anticipo/saldo de forma proporcional.
-   */
-  private combinarPagoInfoApiConCliente(
-    reservaId: number,
-    api: PagoInfoResponseAmigable
-  ): { info: PagoInfoResponseAmigable; ajustado: boolean } {
-    const snap = this.leerCalculoPagoReserva(reservaId);
-    if (!snap || !(snap.total > 0)) {
-      return { info: api, ajustado: false };
-    }
-    const base = api.totalAPagar;
-    if (base > 0 && Math.abs(snap.total - base) < 0.02) {
-      return { info: api, ajustado: false };
-    }
-    if (!(base > 0)) {
-      return {
-        info: {
-          ...api,
-          totalAPagar: snap.total,
-          anticipoReserva: Math.round(snap.total * 0.2 * 100) / 100,
-          saldoRestante: snap.total,
-        },
-        ajustado: true,
-      };
-    }
-    const k = snap.total / base;
-    return {
-      info: {
-        totalAPagar: snap.total,
-        anticipoReserva: Math.round(api.anticipoReserva * k * 100) / 100,
-        saldoRestante: Math.round(api.saldoRestante * k * 100) / 100,
-        banco: api.banco,
-        numeroCuenta: api.numeroCuenta,
-      },
-      ajustado: true,
-    };
-  }
-
-  /** Tras crear reserva: vacía fechas/disp y sincroniza formularios para no arrastrar la reserva anterior. */
-  private resetFormularioTrasReservaExitosa(): void {
-    this.selectedDormIds.set([]);
-    this.disponibilidadResult.set(null);
-    this.reservaForm.patchValue({ fechaInicio: '', noches: 3 });
-    this.dispForm.patchValue({ fechaInicio: '', noches: 3 });
     this.reservaForm.markAsPristine();
     this.reservaForm.markAsUntouched();
     this.dispForm.markAsPristine();
@@ -723,7 +647,7 @@ export class ClienteDashboardComponent {
     if (this.paquetes().length === 0) return false;
     const tel = this.reservaForm.get('telefonoContacto');
     if (!tel?.valid) return false;
-    if (this.mostrarSeleccionDormitoriosReserva() && this.selectedDormIds().length === 0) {
+    if (this.mostrarSeleccionDormitoriosReserva() && this.selectedDormId() == null) {
       return false;
     }
     return this.reservaForm.valid;
@@ -732,6 +656,70 @@ export class ClienteDashboardComponent {
   protected canRegistrarPago(): boolean {
     if (this.loadingPagos()) return false;
     return this.pagoForm.valid;
+  }
+
+  /** Fecha mínima (hoy local) para el input de fecha de pago. */
+  protected fechaMinimaPago(): string {
+    return hoyLocalISODate();
+  }
+
+  private normalizarListaPagos(list: PagoResponse[]): PagoResponse[] {
+    const map = new Map<number, PagoResponse>();
+    for (const p of list ?? []) {
+      if (!p) continue;
+      const ext = p as unknown as { id?: number };
+      const id = Number(p.idPago ?? ext.id);
+      if (!Number.isFinite(id)) continue;
+      map.set(id, { ...p, idPago: id });
+    }
+    return [...map.values()].sort((a, b) => a.idPago - b.idPago);
+  }
+
+  /** Suma montos de la lista cargada. */
+  protected totalPagadoReserva(): number {
+    return this.pagosLista().reduce((s, p) => {
+      const m = Number(p.monto);
+      return s + (Number.isFinite(m) ? m : 0);
+    }, 0);
+  }
+
+  /**
+   * Saldo coherente con el total mostrado y los pagos ya registrados (evita desajustes al escalar importes).
+   */
+  protected saldoRestanteMostrado(info: PagoInfoResponseAmigable): number {
+    const t = Number(info.totalAPagar);
+    const total = Number.isFinite(t) && t > 0 ? t : 0;
+    const pagado = this.totalPagadoReserva();
+    return Math.round(Math.max(0, total - pagado) * 100) / 100;
+  }
+
+  private parseReservaIdDesdePagoForm(): number | null {
+    const v = this.pagoForm.getRawValue().reservaId;
+    const n = typeof v === 'number' ? v : Number(v);
+    if (!Number.isFinite(n) || n < 1) return null;
+    return n;
+  }
+
+  /**
+   * Si el listado de pagos falla (p. ej. 404 sin movimientos), aún mostramos datos de transferencia.
+   */
+  private fetchPagoInfoYPagos(reservaId: number) {
+    return forkJoin({
+      raw: this.pagoService.obtenerInfoPago(reservaId),
+      pagos: this.pagoService
+        .obtenerPagosPorReserva(reservaId)
+        .pipe(catchError(() => of([] as PagoResponse[]))),
+    });
+  }
+
+  private aplicarRespuestaPagoCargado(
+    _reservaId: number,
+    raw: PagoInfoResponse,
+    pagos: PagoResponse[]
+  ): void {
+    void _reservaId;
+    this.pagoInfo.set(transformPagoInfoResponse(raw));
+    this.pagosLista.set(this.normalizarListaPagos(pagos));
   }
 
   protected canComprobarDisponibilidad(): boolean {
@@ -763,7 +751,7 @@ export class ClienteDashboardComponent {
           this.reservaForm.patchValue({ paqueteId: first });
         }
         this.dormitorios.set(dormitorios);
-        this.selectedDormIds.set([]);
+        this.selectedDormId.set(null);
         this.loadingPaquetes.set(false);
         const local = this.casasListado().find((x) => x.codigoCasa === v);
         const casaLocal = local ? this.casaDesdeCatalogoSoloPreview(local) : null;
@@ -790,14 +778,12 @@ export class ClienteDashboardComponent {
     });
   }
 
-  protected toggleDorm(id: number) {
-    this.selectedDormIds.update((ids) =>
-      ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]
-    );
+  protected seleccionarDormitorioReserva(id: number): void {
+    this.selectedDormId.set(id);
   }
 
-  protected isDormSelected(id: number): boolean {
-    return this.selectedDormIds().includes(id);
+  protected isDormitorioReservaSeleccionado(id: number): boolean {
+    return this.selectedDormId() === id;
   }
 
   protected verificarDisponibilidad() {
@@ -851,11 +837,8 @@ export class ClienteDashboardComponent {
       this.reservaForm.markAllAsTouched();
       return;
     }
-    if (this.mostrarSeleccionDormitoriosReserva() && this.selectedDormIds().length === 0) {
-      this.setMsgReserva(
-        'err',
-        'Selecciona al menos 1 dormitorio para el paquete por habitaciones.'
-      );
+    if (this.mostrarSeleccionDormitoriosReserva() && this.selectedDormId() == null) {
+      this.setMsgReserva('err', 'Selecciona una habitación para el paquete por habitaciones.');
       return;
     }
     this.loadingReserva.set(true);
@@ -873,30 +856,24 @@ export class ClienteDashboardComponent {
       casaId: casa,
       paqueteId: r.paqueteId,
     };
-    const ids = this.selectedDormIds();
-    if (
-      ids.length > 0 &&
-      this.mostrarSeleccionDormitoriosReserva()
-    ) {
-      body.dormitoriosIds = ids;
+    const dormId = this.selectedDormId();
+    if (dormId != null && this.mostrarSeleccionDormitoriosReserva()) {
+      body.dormitoriosIds = [dormId];
     }
     body.telefonoContacto = r.telefonoContacto.trim();
 
     this.reservaService.crearReserva(body).subscribe({
       next: (res) => {
         this.loadingReserva.set(false);
-        const est = this.precioReservaEstimado();
         this.ultimaReserva.set(res);
         sessionStorage.setItem(SS_RESERVA, JSON.stringify(res));
         this.pagoForm.patchValue({ reservaId: res.id });
-        if (est && est.total > 0) {
-          this.guardarCalculoPagoReserva(res, est);
-        }
-        this.resetFormularioTrasReservaExitosa();
+        this.resetFormularioTrasReservaExitosa(res);
         this.setMsgReserva(
           'ok',
           `Reserva creada con ID ${res.id}. Fecha límite de pago: ${res.fechaLimitePago}`
         );
+        this.irNav('pagos');
         this.cargarInfoPago({ preserveBanner: true });
       },
       error: (err: HttpErrorResponse) => {
@@ -908,24 +885,21 @@ export class ClienteDashboardComponent {
 
   protected cargarInfoPago(opts?: { preserveBanner?: boolean }) {
     if (!opts?.preserveBanner) this.pagoMensaje.set(null);
-    const id = this.pagoForm.getRawValue().reservaId;
-    if (id == null || id < 1) {
+    const id = this.parseReservaIdDesdePagoForm();
+    if (id == null) {
       this.setPagoFeedback('error', 'Indica un ID de reserva válido.');
       return;
     }
     this.loadingPagos.set(true);
-    this.pagoService.obtenerInfoPago(id).subscribe({
-      next: (raw: PagoInfoResponse) => {
+    this.fetchPagoInfoYPagos(id).subscribe({
+      next: ({ raw, pagos }) => {
         this.loadingPagos.set(false);
-        const base = transformPagoInfoResponse(raw);
-        const { info, ajustado } = this.combinarPagoInfoApiConCliente(id, base);
-        this.pagoInfo.set(info);
-        this.pagoInfoFueAjustado.set(ajustado);
+        this.aplicarRespuestaPagoCargado(id, raw, pagos);
       },
       error: (err: HttpErrorResponse) => {
         this.loadingPagos.set(false);
         this.pagoInfo.set(null);
-        this.pagoInfoFueAjustado.set(false);
+        this.pagosLista.set([]);
         this.setPagoFeedback('error', readApiError(err));
       },
     });
@@ -933,19 +907,20 @@ export class ClienteDashboardComponent {
 
   protected listarPagosReserva(opts?: { preserveBanner?: boolean }) {
     if (!opts?.preserveBanner) this.pagoMensaje.set(null);
-    const id = this.pagoForm.getRawValue().reservaId;
-    if (id == null || id < 1) {
+    const id = this.parseReservaIdDesdePagoForm();
+    if (id == null) {
       this.setPagoFeedback('error', 'Indica un ID de reserva válido.');
       return;
     }
     this.loadingPagos.set(true);
-    this.pagoService.obtenerPagosPorReserva(id).subscribe({
-      next: (list) => {
+    this.fetchPagoInfoYPagos(id).subscribe({
+      next: ({ raw, pagos }) => {
         this.loadingPagos.set(false);
-        this.pagosLista.set(list);
+        this.aplicarRespuestaPagoCargado(id, raw, pagos);
       },
       error: (err: HttpErrorResponse) => {
         this.loadingPagos.set(false);
+        this.pagoInfo.set(null);
         this.pagosLista.set([]);
         this.setPagoFeedback('error', readApiError(err));
       },
@@ -956,16 +931,18 @@ export class ClienteDashboardComponent {
     this.pagoMensaje.set(null);
     if (this.pagoForm.invalid) {
       this.pagoForm.markAllAsTouched();
+      if (this.pagoForm.get('fechaPago')?.hasError('fechaPagoPasada')) {
+        this.setPagoFeedback('error', 'La fecha de pago no puede ser anterior a hoy.');
+      }
       return;
     }
     const p = this.pagoForm.getRawValue();
-    const reservaId = p.reservaId;
+    const reservaId = this.parseReservaIdDesdePagoForm();
     const monto = p.monto;
     const metodoPago = p.metodoPago;
     const fechaPago = p.fechaPago;
     if (
       reservaId == null ||
-      reservaId < 1 ||
       monto == null ||
       metodoPago == null ||
       !fechaPago?.trim()
@@ -973,58 +950,79 @@ export class ClienteDashboardComponent {
       this.pagoForm.markAllAsTouched();
       return;
     }
-    const info = this.pagoInfo();
-    if (info && Number.isFinite(info.totalAPagar) && monto > info.totalAPagar) {
-      this.setPagoFeedback('error', 'El pago excede el total de la reserva');
+    const montoNum = Number(monto);
+    if (!Number.isFinite(montoNum) || montoNum < 0.01) {
+      this.pagoForm.markAllAsTouched();
       return;
     }
+    const montoJson = Math.round(montoNum * 100) / 100;
+
+    /** Importes y lista al día antes de validar y enviar (evita saldo obsoleto en pantalla). */
     this.loadingPagos.set(true);
-    this.pagoService
-      .registrarPago({
-        reservaId,
-        monto,
-        metodoPago,
-        fechaPago,
-        confirmado: true,
-      })
-      .subscribe({
-        next: () => {
+    this.fetchPagoInfoYPagos(reservaId).subscribe({
+      next: ({ raw, pagos }) => {
+        this.aplicarRespuestaPagoCargado(reservaId, raw, pagos);
+        const info = this.pagoInfo();
+        if (!info) {
           this.loadingPagos.set(false);
-          this.setPagoFeedback('success', 'Pago registrado correctamente.');
-          const rid = reservaId;
-          const hoy = new Date().toISOString().slice(0, 10);
-
-          this.pagoService.obtenerPagosPorReserva(rid).subscribe({
-            next: (list) => this.pagosLista.set(list),
-            error: () => this.pagosLista.set([]),
-          });
-          this.pagoService.obtenerInfoPago(rid).subscribe({
-            next: (raw: PagoInfoResponse) => {
-              const base = transformPagoInfoResponse(raw);
-              const { info, ajustado } = this.combinarPagoInfoApiConCliente(rid, base);
-              this.pagoInfo.set(info);
-              this.pagoInfoFueAjustado.set(ajustado);
-            },
-            error: () => {
-              this.pagoInfo.set(null);
-              this.pagoInfoFueAjustado.set(false);
-            },
-          });
-
-          this.pagoForm.patchValue({
-            reservaId: rid,
-            monto: 0,
-            metodoPago: MetodoPago.TRANSFERENCIA,
-            fechaPago: hoy,
-          });
-          this.pagoForm.markAsPristine();
-          this.pagoForm.markAsUntouched();
-        },
-        error: (err: HttpErrorResponse) => {
+          this.setPagoFeedback('error', 'No se pudieron cargar los importes de esta reserva.');
+          return;
+        }
+        const pendiente = this.saldoRestanteMostrado(info);
+        if (montoJson > pendiente + 0.005) {
           this.loadingPagos.set(false);
-          this.setPagoFeedback('error', readApiError(err));
-        },
-      });
+          this.setPagoFeedback(
+            'error',
+            `El importe supera el saldo pendiente (${pendiente.toFixed(2)} €).`
+          );
+          return;
+        }
+
+        this.pagoService
+          .registrarPago({
+            reservaId,
+            monto: montoJson,
+            metodoPago,
+            fechaPago,
+            confirmado: true,
+          })
+          .subscribe({
+            next: () => {
+              this.loadingPagos.set(false);
+              this.setPagoFeedback('success', 'Pago registrado correctamente.');
+              const rid = reservaId;
+              const hoy = hoyLocalISODate();
+
+              this.fetchPagoInfoYPagos(rid).subscribe({
+                next: ({ raw: r2, pagos: p2 }) => {
+                  this.aplicarRespuestaPagoCargado(rid, r2, p2);
+                },
+                error: () => {
+                  this.pagoInfo.set(null);
+                  this.pagosLista.set([]);
+                },
+              });
+
+              this.pagoForm.patchValue({
+                reservaId: rid,
+                monto: 0,
+                metodoPago: MetodoPago.TRANSFERENCIA,
+                fechaPago: hoy,
+              });
+              this.pagoForm.markAsPristine();
+              this.pagoForm.markAsUntouched();
+            },
+            error: (err: HttpErrorResponse) => {
+              this.loadingPagos.set(false);
+              this.setPagoFeedback('error', readApiError(err));
+            },
+          });
+      },
+      error: (err: HttpErrorResponse) => {
+        this.loadingPagos.set(false);
+        this.setPagoFeedback('error', readApiError(err));
+      },
+    });
   }
 
   protected logout() {
