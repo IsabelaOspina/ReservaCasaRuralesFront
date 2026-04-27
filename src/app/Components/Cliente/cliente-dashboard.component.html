@@ -45,8 +45,8 @@
         <button
           type="button"
           class="cli__nav-item"
-          [class.cli__nav-item--active]="navActiva() === 'reservas'"
-          (click)="irNav('reservas')"
+          [class.cli__nav-item--active]="navActiva() === 'misreservas'"
+          (click)="irNav('misreservas')"
         >
           <span class="cli__nav-ico" aria-hidden="true">☰</span>
           Mis reservas
@@ -365,13 +365,52 @@
             <h3 class="cli__h3">Última reserva en esta sesión</h3>
             <p>
               ID <strong>{{ ur.id }}</strong> · {{ ur.fechaInicio }} → {{ ur.fechaFin }} · {{ ur.noches }} noches ·
-              confirmada: {{ ur.confirmada ? 'sí' : 'no' }}
+              estado: {{ ur.estado }}
             </p>
             <p class="cli__muted">Límite pago: {{ ur.fechaLimitePago }}</p>
           </div>
         }
       </section>
 
+      <!-- Mis reservas -->
+      <section class="cli__card" id="sec-misreservas">
+        <h2 class="cli__h2"><span class="cli__num">&#128203;</span> Mis reservas</h2>
+        <button type="button" class="cli__btn cli__btn--primary" (click)="cargarMisReservas()" [disabled]="loadingMisReservas()">
+          {{ loadingMisReservas() ? 'Cargando...' : 'Consultar mis reservas' }}
+        </button>
+        @if (misReservas().length) {
+          <ul class="cli__mis-reservas-list">
+            @for (r of misReservas(); track r.id) {
+              <li class="cli__mis-reserva-card">
+                <div class="cli__mis-reserva-card__row">
+                  <span class="cli__mis-reserva-card__id">Reserva #{{ r.id }}</span>
+                  <span
+                    class="cli__estado-badge"
+                    [class.cli__estado-badge--pendiente]="r.estado === 'PENDIENTE'"
+                    [class.cli__estado-badge--confirmada]="r.estado === 'CONFIRMADA'"
+                    [class.cli__estado-badge--cancelada]="r.estado === 'CANCELADA'"
+                  >
+                    {{ etiquetaEstado(r.estado) }}
+                  </span>
+                </div>
+                <div class="cli__mis-reserva-card__detail">
+                  <span>{{ r.fechaInicio }} &rarr; {{ r.fechaFin }}</span>
+                  <span>{{ r.noches }} noches</span>
+                </div>
+                <div class="cli__mis-reserva-card__meta">
+                  <span class="cli__pago-chip">Casa #{{ r.casaId }}</span>
+                  <span class="cli__pago-chip cli__pago-chip--date">Creada: {{ r.fechaCreacion }}</span>
+                  @if (r.estado === 'PENDIENTE') {
+                    <span class="cli__pago-chip cli__pago-chip--date">L&iacute;mite pago: {{ r.fechaLimitePago }}</span>
+                  }
+                </div>
+              </li>
+            }
+          </ul>
+        } @else if (!loadingMisReservas()) {
+          <p class="cli__muted" style="margin-top: 1rem;">No se encontraron reservas. Pulsa el bot&oacute;n para consultar.</p>
+        }
+      </section>
       <!-- 6. Pagos -->
       <section class="cli__card" id="sec-pagos">
         <h2 class="cli__h2"><span class="cli__num">6</span> Pagos</h2>

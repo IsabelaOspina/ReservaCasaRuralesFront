@@ -33,4 +33,11 @@ export class ReservaService {
   verificarDisponibilidad(data: DisponibilidadRequest): Observable<DisponibilidadResponse> {
     return this.http.post<DisponibilidadResponse>(`${this.apiUrl}/disponibilidad`, data);
   }
+  /**
+   * Obtener todas las reservas del cliente autenticado
+   * @returns Observable con la lista de reservas del cliente
+   */
+  obtenerMisReservas(): Observable<ReservaResponse[]> {
+    return this.http.get<ReservaResponse[]>(`${this.apiUrl}/mis-reservas`);
+  }
 }

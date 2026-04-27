@@ -3,7 +3,7 @@ export interface ReservaResponse {
   fechaInicio: string; 
   fechaFin: string; 
   noches: number;
-  confirmada: boolean;
+  estado: string;
   fechaLimitePago: string; 
   fechaCreacion: string; 
   casaId: number;

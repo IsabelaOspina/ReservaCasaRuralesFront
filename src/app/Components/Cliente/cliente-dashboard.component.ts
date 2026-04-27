@@ -101,6 +101,9 @@ export class ClienteDashboardComponent {
   protected readonly ultimaReserva = signal<ReservaResponse | null>(null);
   protected readonly loadingReserva = signal(false);
 
+  protected readonly misReservas = signal<ReservaResponse[]>([]);
+  protected readonly loadingMisReservas = signal(false);
+
   protected readonly pagoInfo = signal(
     null as ReturnType<typeof transformPagoInfoResponse> | null
   );
@@ -130,7 +133,7 @@ export class ClienteDashboardComponent {
   protected readonly fichaCasaCatalogo = signal<CasaClienteCatalogo | null>(null);
   protected readonly loadingGaleriaCasa = signal(false);
   protected readonly navActiva = signal<
-    'flujo' | 'reservas' | 'disponibilidad' | 'pagos'
+    'flujo' | 'reservas' | 'disponibilidad' | 'pagos' | 'misreservas'
   >('flujo');
 
   protected readonly codigoForm = this.fb.nonNullable.group({
@@ -382,13 +385,14 @@ export class ClienteDashboardComponent {
     this.cargarDatosCasa(c.codigoCasa);
   }
 
-  protected irNav(dest: 'flujo' | 'reservas' | 'disponibilidad' | 'pagos') {
+  protected irNav(dest: 'flujo' | 'reservas' | 'disponibilidad' | 'pagos' | 'misreservas') {
     this.navActiva.set(dest);
     const map: Record<typeof dest, string> = {
       flujo: 'sec-casas',
       reservas: 'sec-reserva',
       disponibilidad: 'sec-disponibilidad',
       pagos: 'sec-pagos',
+      misreservas: 'sec-misreservas',
     };
     const id = map[dest];
     queueMicrotask(() =>
@@ -1023,6 +1027,29 @@ export class ClienteDashboardComponent {
         this.setPagoFeedback('error', readApiError(err));
       },
     });
+  }
+
+  protected cargarMisReservas() {
+    this.loadingMisReservas.set(true);
+    this.reservaService.obtenerMisReservas().subscribe({
+      next: (reservas) => {
+        this.loadingMisReservas.set(false);
+        this.misReservas.set(reservas);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.loadingMisReservas.set(false);
+        this.misReservas.set([]);
+      },
+    });
+  }
+
+  protected etiquetaEstado(estado: string): string {
+    switch (estado) {
+      case 'PENDIENTE': return 'Pendiente';
+      case 'CONFIRMADA': return 'Confirmada';
+      case 'CANCELADA': return 'Cancelada';
+      default: return estado;
+    }
   }
 
   protected logout() {
