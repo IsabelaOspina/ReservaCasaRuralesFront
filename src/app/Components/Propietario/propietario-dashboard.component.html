@@ -2,62 +2,27 @@
   <aside class="prop-sidebar" aria-label="Navegación del panel">
     <div class="prop-sidebar__logo" aria-hidden="true">
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path
-          d="M3 10.5L12 3l9 7.5"
-          stroke="currentColor"
-          stroke-width="1.8"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
-        <path
-          d="M5.5 9.9V21h13V9.9"
-          stroke="currentColor"
-          stroke-width="1.8"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
-        <path
-          d="M10 21v-7.2a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2V21"
-          stroke="currentColor"
-          stroke-width="1.8"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
+        <path d="M3 10.5L12 3l9 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M5.5 9.9V21h13V9.9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M10 21v-7.2a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2V21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
       <span>RuralRefuge</span>
     </div>
     <nav class="prop-sidebar__nav">
-      <button
-        type="button"
-        class="prop-nav-btn"
-        [class.prop-nav-btn--active]="tab() === 'casa'"
-        (click)="setTab('casa')"
-      >
+      <button type="button" class="prop-nav-btn" [class.prop-nav-btn--active]="tab() === 'casa'" (click)="setTab('casa')">
         Alta casa
       </button>
-      <button
-        type="button"
-        class="prop-nav-btn"
-        [class.prop-nav-btn--active]="tab() === 'paquetes'"
-        (click)="setTab('paquetes')"
-      >
+      <button type="button" class="prop-nav-btn" [class.prop-nav-btn--active]="tab() === 'paquetes'" (click)="setTab('paquetes')">
         Paquetes
       </button>
-      <button
-        type="button"
-        class="prop-nav-btn"
-        [class.prop-nav-btn--active]="tab() === 'dormitorios'"
-        (click)="setTab('dormitorios')"
-      >
+      <button type="button" class="prop-nav-btn" [class.prop-nav-btn--active]="tab() === 'dormitorios'" (click)="setTab('dormitorios')">
         Dormitorios
       </button>
-      <button
-        type="button"
-        class="prop-nav-btn"
-        [class.prop-nav-btn--active]="tab() === 'cocinas'"
-        (click)="setTab('cocinas')"
-      >
+      <button type="button" class="prop-nav-btn" [class.prop-nav-btn--active]="tab() === 'cocinas'" (click)="setTab('cocinas')">
         Cocinas
+      </button>
+      <button type="button" class="prop-nav-btn" [class.prop-nav-btn--active]="tab() === 'reservas'" (click)="setTab('reservas')">
+        Reservas
       </button>
     </nav>
     <a class="prop-sidebar__link" routerLink="/login">Volver al acceso</a>
@@ -105,37 +70,20 @@
     </section>
 
     <nav class="prop-tabs" aria-label="Secciones del panel">
-      <button
-        type="button"
-        class="prop-tab"
-        [class.prop-tab--active]="tab() === 'casa'"
-        (click)="setTab('casa')"
-      >
+      <button type="button" class="prop-tab" [class.prop-tab--active]="tab() === 'casa'" (click)="setTab('casa')">
         Alta casa
       </button>
-      <button
-        type="button"
-        class="prop-tab"
-        [class.prop-tab--active]="tab() === 'paquetes'"
-        (click)="setTab('paquetes')"
-      >
+      <button type="button" class="prop-tab" [class.prop-tab--active]="tab() === 'paquetes'" (click)="setTab('paquetes')">
         Paquetes
       </button>
-      <button
-        type="button"
-        class="prop-tab"
-        [class.prop-tab--active]="tab() === 'dormitorios'"
-        (click)="setTab('dormitorios')"
-      >
+      <button type="button" class="prop-tab" [class.prop-tab--active]="tab() === 'dormitorios'" (click)="setTab('dormitorios')">
         Dormitorios
       </button>
-      <button
-        type="button"
-        class="prop-tab"
-        [class.prop-tab--active]="tab() === 'cocinas'"
-        (click)="setTab('cocinas')"
-      >
+      <button type="button" class="prop-tab" [class.prop-tab--active]="tab() === 'cocinas'" (click)="setTab('cocinas')">
         Cocinas
+      </button>
+      <button type="button" class="prop-tab" [class.prop-tab--active]="tab() === 'reservas'" (click)="setTab('reservas')">
+        Reservas
       </button>
     </nav>
 
@@ -148,6 +96,8 @@
 
     <div class="prop-work">
       <main class="prop-content">
+
+        <!-- ——— ALTA CASA ——— -->
         @if (tab() === 'casa') {
           <article class="card">
             <h2 class="card__title">Registrar casa rural</h2>
@@ -155,95 +105,61 @@
               <div class="form-grid">
                 <label class="form-field span-2">
                   <span class="form-label">Población</span>
-                  <input
-                    type="text"
-                    formControlName="poblacion"
-                    placeholder="Ej. Valldemossa"
-                    [class.input--invalid]="fieldStateCasa('poblacion') === 'invalid'"
-                    [class.input--valid]="fieldStateCasa('poblacion') === 'valid'"
-                    autocomplete="address-level2"
-                  />
-                  @if (
-                    casaForm.get('poblacion')?.invalid &&
-                    (casaForm.get('poblacion')?.dirty || casaForm.get('poblacion')?.touched)
-                  ) {
+                  <input type="text" formControlName="poblacion" placeholder="Ej. Valldemossa"
+                         [class.input--invalid]="fieldStateCasa('poblacion') === 'invalid'"
+                         [class.input--valid]="fieldStateCasa('poblacion') === 'valid'"
+                         autocomplete="address-level2" />
+                  @if (casaForm.get('poblacion')?.invalid && (casaForm.get('poblacion')?.dirty || casaForm.get('poblacion')?.touched)) {
                     <span class="form-error" role="alert">La población es obligatoria.</span>
                   }
                 </label>
                 <label class="form-field span-2">
                   <span class="form-label">Descripción</span>
-                  <textarea
-                    rows="4"
-                    formControlName="descripcion"
-                    placeholder="Describe el alojamiento, entorno y servicios relevantes."
-                    [class.input--invalid]="fieldStateCasa('descripcion') === 'invalid'"
-                    [class.input--valid]="fieldStateCasa('descripcion') === 'valid'"
-                  ></textarea>
-                  @if (
-                    casaForm.get('descripcion')?.invalid &&
-                    (casaForm.get('descripcion')?.dirty || casaForm.get('descripcion')?.touched)
-                  ) {
+                  <textarea rows="4" formControlName="descripcion" placeholder="Describe el alojamiento, entorno y servicios relevantes."
+                            [class.input--invalid]="fieldStateCasa('descripcion') === 'invalid'"
+                            [class.input--valid]="fieldStateCasa('descripcion') === 'valid'"></textarea>
+                  @if (casaForm.get('descripcion')?.invalid && (casaForm.get('descripcion')?.dirty || casaForm.get('descripcion')?.touched)) {
                     <span class="form-error" role="alert">La descripción es obligatoria.</span>
                   }
                 </label>
                 <label class="form-field">
                   <span class="form-label">Número de dormitorios</span>
-                  <input
-                    type="number"
-                    min="3"
-                    formControlName="numeroDormitorios"
-                    [class.input--invalid]="fieldStateCasa('numeroDormitorios') === 'invalid'"
-                    [class.input--valid]="fieldStateCasa('numeroDormitorios') === 'valid'"
-                  />
+                  <input type="number" min="3" formControlName="numeroDormitorios"
+                         [class.input--invalid]="fieldStateCasa('numeroDormitorios') === 'invalid'"
+                         [class.input--valid]="fieldStateCasa('numeroDormitorios') === 'valid'" />
                   @if (casaForm.get('numeroDormitorios')?.invalid && (casaForm.get('numeroDormitorios')?.dirty || casaForm.get('numeroDormitorios')?.touched)) {
                     <span class="form-error" role="alert">Mínimo 3.</span>
                   }
                 </label>
                 <label class="form-field">
                   <span class="form-label">Número de baños</span>
-                  <input
-                    type="number"
-                    min="2"
-                    formControlName="numeroBanos"
-                    [class.input--invalid]="fieldStateCasa('numeroBanos') === 'invalid'"
-                    [class.input--valid]="fieldStateCasa('numeroBanos') === 'valid'"
-                  />
+                  <input type="number" min="2" formControlName="numeroBanos"
+                         [class.input--invalid]="fieldStateCasa('numeroBanos') === 'invalid'"
+                         [class.input--valid]="fieldStateCasa('numeroBanos') === 'valid'" />
                   @if (casaForm.get('numeroBanos')?.invalid && (casaForm.get('numeroBanos')?.dirty || casaForm.get('numeroBanos')?.touched)) {
                     <span class="form-error" role="alert">Mínimo 2.</span>
                   }
                 </label>
                 <label class="form-field">
                   <span class="form-label">Número de cocinas</span>
-                  <input
-                    type="number"
-                    min="1"
-                    formControlName="numeroCocinas"
-                    [class.input--invalid]="fieldStateCasa('numeroCocinas') === 'invalid'"
-                    [class.input--valid]="fieldStateCasa('numeroCocinas') === 'valid'"
-                  />
+                  <input type="number" min="1" formControlName="numeroCocinas"
+                         [class.input--invalid]="fieldStateCasa('numeroCocinas') === 'invalid'"
+                         [class.input--valid]="fieldStateCasa('numeroCocinas') === 'valid'" />
                   @if (casaForm.get('numeroCocinas')?.invalid && (casaForm.get('numeroCocinas')?.dirty || casaForm.get('numeroCocinas')?.touched)) {
                     <span class="form-error" role="alert">Mínimo 1.</span>
                   }
                 </label>
                 <label class="form-field">
                   <span class="form-label">Comedores</span>
-                  <input
-                    type="number"
-                    min="0"
-                    formControlName="numeroComedores"
-                    [class.input--invalid]="fieldStateCasa('numeroComedores') === 'invalid'"
-                    [class.input--valid]="fieldStateCasa('numeroComedores') === 'valid'"
-                  />
+                  <input type="number" min="0" formControlName="numeroComedores"
+                         [class.input--invalid]="fieldStateCasa('numeroComedores') === 'invalid'"
+                         [class.input--valid]="fieldStateCasa('numeroComedores') === 'valid'" />
                 </label>
                 <label class="form-field span-2">
                   <span class="form-label">Plazas de garaje</span>
-                  <input
-                    type="number"
-                    min="0"
-                    formControlName="plazasGaraje"
-                    [class.input--invalid]="fieldStateCasa('plazasGaraje') === 'invalid'"
-                    [class.input--valid]="fieldStateCasa('plazasGaraje') === 'valid'"
-                  />
+                  <input type="number" min="0" formControlName="plazasGaraje"
+                         [class.input--invalid]="fieldStateCasa('plazasGaraje') === 'invalid'"
+                         [class.input--valid]="fieldStateCasa('plazasGaraje') === 'valid'" />
                 </label>
               </div>
 
@@ -252,8 +168,7 @@
                   <div>
                     <h3 class="fotos-block__title">Fotografías</h3>
                     <p class="fotos-block__hint">
-                      Adjunta imágenes desde tu dispositivo. Cada foto requiere descripción; el envío es multipart al
-                      registrar la casa.
+                      Adjunta imágenes desde tu dispositivo. Cada foto requiere descripción; el envío es multipart al registrar la casa.
                     </p>
                   </div>
                   <button type="button" class="btn btn--add-foto" (click)="addFotoRow()">Añadir foto</button>
@@ -263,29 +178,15 @@
                     <div class="foto-block__row">
                       <label class="form-field">
                         <span class="form-label">Imagen {{ i + 1 }}</span>
-                        <input
-                          #fotoFileInput
-                          type="file"
-                          accept="image/*"
-                          class="input-file"
-                          (change)="onFotoSeleccionada($event, i)"
-                        />
+                        <input #fotoFileInput type="file" accept="image/*" class="input-file" (change)="onFotoSeleccionada($event, i)" />
                         <span class="input-file-name">{{ nombreArchivoFoto(i) }}</span>
                       </label>
                       <label class="form-field">
                         <span class="form-label">Descripción de la imagen</span>
-                        <input
-                          type="text"
-                          formControlName="descripcion"
-                          placeholder="Ej. Fachada principal"
-                          [class.input--invalid]="fieldStateFotoDesc(i) === 'invalid'"
-                          [class.input--valid]="fieldStateFotoDesc(i) === 'valid'"
-                        />
-                        @if (
-                          fotosRows.at(i).get('descripcion')!.invalid &&
-                          (fotosRows.at(i).get('descripcion')!.dirty ||
-                            fotosRows.at(i).get('descripcion')!.touched)
-                        ) {
+                        <input type="text" formControlName="descripcion" placeholder="Ej. Fachada principal"
+                               [class.input--invalid]="fieldStateFotoDesc(i) === 'invalid'"
+                               [class.input--valid]="fieldStateFotoDesc(i) === 'valid'" />
+                        @if (fotosRows.at(i).get('descripcion')!.invalid && (fotosRows.at(i).get('descripcion')!.dirty || fotosRows.at(i).get('descripcion')!.touched)) {
                           <span class="form-error" role="alert">Descripción obligatoria.</span>
                         }
                       </label>
@@ -309,6 +210,7 @@
           </article>
         }
 
+        <!-- ——— PAQUETES ——— -->
         @if (tab() === 'paquetes') {
           <article class="card">
             <h2 class="card__title">Paquetes de alquiler</h2>
@@ -341,46 +243,33 @@
               <div class="form-grid">
                 <label class="form-field">
                   <span class="form-label">Inicio</span>
-                  <input
-                    type="date"
-                    formControlName="fechaInicio"
-                    [class.input--invalid]="fieldStatePaquete('fechaInicio') === 'invalid'"
-                    [class.input--valid]="fieldStatePaquete('fechaInicio') === 'valid'"
-                  />
+                  <input type="date" formControlName="fechaInicio"
+                         [class.input--invalid]="fieldStatePaquete('fechaInicio') === 'invalid'"
+                         [class.input--valid]="fieldStatePaquete('fechaInicio') === 'valid'" />
                 </label>
                 <label class="form-field">
                   <span class="form-label">Fin</span>
-                  <input
-                    type="date"
-                    formControlName="fechaFin"
-                    [class.input--invalid]="fieldStatePaquete('fechaFin') === 'invalid'"
-                    [class.input--valid]="fieldStatePaquete('fechaFin') === 'valid'"
-                  />
+                  <input type="date" formControlName="fechaFin"
+                         [class.input--invalid]="fieldStatePaquete('fechaFin') === 'invalid'"
+                         [class.input--valid]="fieldStatePaquete('fechaFin') === 'valid'" />
                 </label>
                 @if (paqueteFechasInvalidas('nuevo')) {
                   <p class="form-error span-2" role="alert">La fecha fin debe ser posterior o igual al inicio.</p>
                 }
                 <label class="form-field">
                   <span class="form-label">Precio por noche</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    formControlName="precio"
-                    [class.input--invalid]="fieldStatePaquete('precio') === 'invalid'"
-                    [class.input--valid]="fieldStatePaquete('precio') === 'valid'"
-                  />
+                  <input type="number" step="0.01" min="0.01" formControlName="precio"
+                         [class.input--invalid]="fieldStatePaquete('precio') === 'invalid'"
+                         [class.input--valid]="fieldStatePaquete('precio') === 'valid'" />
                   @if (paqueteForm.get('precio')?.invalid && (paqueteForm.get('precio')?.dirty || paqueteForm.get('precio')?.touched)) {
                     <span class="form-error" role="alert">Indica un precio mayor que 0.</span>
                   }
                 </label>
                 <label class="form-field">
                   <span class="form-label">Tipo de alquiler</span>
-                  <select
-                    formControlName="tipoAlquiler"
-                    [class.input--invalid]="fieldStatePaquete('tipoAlquiler') === 'invalid'"
-                    [class.input--valid]="fieldStatePaquete('tipoAlquiler') === 'valid'"
-                  >
+                  <select formControlName="tipoAlquiler"
+                          [class.input--invalid]="fieldStatePaquete('tipoAlquiler') === 'invalid'"
+                          [class.input--valid]="fieldStatePaquete('tipoAlquiler') === 'valid'">
                     @for (t of tiposAlquiler; track t) {
                       <option [ngValue]="t">{{ t }}</option>
                     }
@@ -402,35 +291,24 @@
                 </label>
                 <label class="form-field">
                   <span class="form-label">Inicio</span>
-                  <input
-                    type="date"
-                    formControlName="fechaInicio"
-                    [class.input--invalid]="fieldStatePaquete('fechaInicio', 'edit') === 'invalid'"
-                    [class.input--valid]="fieldStatePaquete('fechaInicio', 'edit') === 'valid'"
-                  />
+                  <input type="date" formControlName="fechaInicio"
+                         [class.input--invalid]="fieldStatePaquete('fechaInicio', 'edit') === 'invalid'"
+                         [class.input--valid]="fieldStatePaquete('fechaInicio', 'edit') === 'valid'" />
                 </label>
                 <label class="form-field">
                   <span class="form-label">Fin</span>
-                  <input
-                    type="date"
-                    formControlName="fechaFin"
-                    [class.input--invalid]="fieldStatePaquete('fechaFin', 'edit') === 'invalid'"
-                    [class.input--valid]="fieldStatePaquete('fechaFin', 'edit') === 'valid'"
-                  />
+                  <input type="date" formControlName="fechaFin"
+                         [class.input--invalid]="fieldStatePaquete('fechaFin', 'edit') === 'invalid'"
+                         [class.input--valid]="fieldStatePaquete('fechaFin', 'edit') === 'valid'" />
                 </label>
                 @if (paqueteFechasInvalidas('edit')) {
                   <p class="form-error span-2" role="alert">La fecha fin debe ser posterior o igual al inicio.</p>
                 }
                 <label class="form-field">
                   <span class="form-label">Precio</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    formControlName="precio"
-                    [class.input--invalid]="fieldStatePaquete('precio', 'edit') === 'invalid'"
-                    [class.input--valid]="fieldStatePaquete('precio', 'edit') === 'valid'"
-                  />
+                  <input type="number" step="0.01" min="0.01" formControlName="precio"
+                         [class.input--invalid]="fieldStatePaquete('precio', 'edit') === 'invalid'"
+                         [class.input--valid]="fieldStatePaquete('precio', 'edit') === 'valid'" />
                 </label>
                 <label class="form-field span-2">
                   <span class="form-label">Tipo</span>
@@ -448,6 +326,7 @@
           </article>
         }
 
+        <!-- ——— DORMITORIOS ——— -->
         @if (tab() === 'dormitorios') {
           <article class="card">
             <h2 class="card__title">Dormitorios</h2>
@@ -464,8 +343,7 @@
               }
               @if (cupoBanosLleno() && !cupoDormitoriosLleno()) {
                 <p class="alert alert--info" role="status">
-                  Cupo de baños completo: no puedes marcar más dormitorios con baño. Quita el baño en este registro o
-                  revisa los dormitorios ya creados.
+                  Cupo de baños completo: no puedes marcar más dormitorios con baño.
                 </p>
               }
               @if (cupoDormitoriosLleno()) {
@@ -474,26 +352,16 @@
                 </p>
               }
             } @else if (!loading()) {
-              <p class="cupo-banner cupo-banner--muted">
-                Aún no tenemos el cupo de dormitorios de esta casa.
-              </p>
+              <p class="cupo-banner cupo-banner--muted">Aún no tenemos el cupo de dormitorios de esta casa.</p>
             }
             @if (dormitorios().length) {
               <div class="data-grid data-grid--dorms" role="list">
                 @for (d of dormitorios(); track d.idDormitorio) {
                   <article class="data-card data-card--dorm" role="listitem">
-                    <h3 class="data-card__name">
-                      {{ $any(d).nombre ?? ('Dormitorio #' + d.idDormitorio) }}
-                    </h3>
+                    <h3 class="data-card__name">{{ $any(d).nombre ?? ('Dormitorio #' + d.idDormitorio) }}</h3>
                     <dl class="data-card__meta">
-                      <div>
-                        <dt>Camas</dt>
-                        <dd>{{ d.numeroCamas }}</dd>
-                      </div>
-                      <div>
-                        <dt>Tipo</dt>
-                        <dd>{{ etiquetaTipoCama(d.tipoCama) }}</dd>
-                      </div>
+                      <div><dt>Camas</dt><dd>{{ d.numeroCamas }}</dd></div>
+                      <div><dt>Tipo</dt><dd>{{ etiquetaTipoCama(d.tipoCama) }}</dd></div>
                       <div>
                         <dt>Baño</dt>
                         <dd>
@@ -513,37 +381,27 @@
               <div class="form-grid">
                 <label class="form-field">
                   <span class="form-label">Nombre</span>
-                  <input
-                    type="text"
-                    formControlName="nombre"
-                    placeholder="Ej. Principal"
-                    [class.input--invalid]="fieldStateDorm('nombre') === 'invalid'"
-                    [class.input--valid]="fieldStateDorm('nombre') === 'valid'"
-                  />
+                  <input type="text" formControlName="nombre" placeholder="Ej. Principal"
+                         [class.input--invalid]="fieldStateDorm('nombre') === 'invalid'"
+                         [class.input--valid]="fieldStateDorm('nombre') === 'valid'" />
                   @if (dormForm.get('nombre')?.invalid && (dormForm.get('nombre')?.dirty || dormForm.get('nombre')?.touched)) {
                     <span class="form-error" role="alert">Nombre obligatorio.</span>
                   }
                 </label>
                 <label class="form-field">
                   <span class="form-label">Número de camas</span>
-                  <input
-                    type="number"
-                    min="1"
-                    formControlName="numeroCamas"
-                    [class.input--invalid]="fieldStateDorm('numeroCamas') === 'invalid'"
-                    [class.input--valid]="fieldStateDorm('numeroCamas') === 'valid'"
-                  />
+                  <input type="number" min="1" formControlName="numeroCamas"
+                         [class.input--invalid]="fieldStateDorm('numeroCamas') === 'invalid'"
+                         [class.input--valid]="fieldStateDorm('numeroCamas') === 'valid'" />
                   @if (dormForm.get('numeroCamas')?.invalid && (dormForm.get('numeroCamas')?.dirty || dormForm.get('numeroCamas')?.touched)) {
                     <span class="form-error" role="alert">Mínimo 1 cama.</span>
                   }
                 </label>
                 <label class="form-field">
                   <span class="form-label">Tipo de cama</span>
-                  <select
-                    formControlName="tipoCama"
-                    [class.input--invalid]="fieldStateDorm('tipoCama') === 'invalid'"
-                    [class.input--valid]="fieldStateDorm('tipoCama') === 'valid'"
-                  >
+                  <select formControlName="tipoCama"
+                          [class.input--invalid]="fieldStateDorm('tipoCama') === 'invalid'"
+                          [class.input--valid]="fieldStateDorm('tipoCama') === 'valid'">
                     @for (o of opcionesCama; track o.value) {
                       <option [ngValue]="o.value">{{ o.label }}</option>
                     }
@@ -563,6 +421,7 @@
           </article>
         }
 
+        <!-- ——— COCINAS ——— -->
         @if (tab() === 'cocinas') {
           <article class="card">
             <h2 class="card__title">Cocinas</h2>
@@ -577,9 +436,7 @@
                 </p>
               }
             } @else if (!loading()) {
-              <p class="cupo-banner cupo-banner--muted">
-                Aún no tenemos el cupo de cocinas de esta casa.
-              </p>
+              <p class="cupo-banner cupo-banner--muted">Aún no tenemos el cupo de cocinas de esta casa.</p>
             }
             @if (cocinas().length) {
               <div class="data-grid data-grid--cocinas" role="list">
@@ -625,17 +482,84 @@
             </form>
           </article>
         }
+
+        <!-- ——— RESERVAS ——— -->
+        @if (tab() === 'reservas') {
+
+          <!-- Notificaciones de reservas expiradas -->
+          @if (notificaciones().length > 0) {
+            <article class="card">
+              <h2 class="card__title">🔔 Notificaciones — Reservas expiradas</h2>
+              <p class="card__help">
+                Las siguientes reservas han superado su fecha límite de pago y requieren tu atención.
+              </p>
+              @for (n of notificaciones(); track n.telefono) {
+                <div class="reserva-notif">
+                  <div class="reserva-notif__icon" aria-hidden="true">⚠️</div>
+                  <div class="reserva-notif__body">
+                    <p class="reserva-notif__msg">{{ n.mensaje }}</p>
+                    <p class="reserva-notif__meta">
+                      <span>📞 {{ n.telefono }}</span>
+                      <span class="reserva-notif__sep">·</span>
+                      <span>Límite: <strong>{{ n.fechaLimitePago }}</strong></span>
+                    </p>
+                  </div>
+                </div>
+              }
+            </article>
+          }
+
+          <!-- Reservas pendientes -->
+          <article class="card">
+            <h2 class="card__title">Reservas pendientes</h2>
+            <p class="card__help">
+              Puedes anular reservas pendientes siempre que el cliente no haya pagado el 20% del anticipo.
+            </p>
+
+            @if (loading()) {
+              <p class="alert alert--info">Cargando reservas…</p>
+            } @else if (reservasPendientes().length === 0) {
+              <p class="muted-block">No hay reservas pendientes en este momento.</p>
+            } @else {
+              <div class="data-grid data-grid--reservas" role="list">
+                @for (r of reservasPendientes(); track r.id) {
+                  <article class="data-card data-card--reserva" role="listitem">
+                    <div class="data-card__head">
+                      <span class="data-card__badge">Reserva #{{ r.id }}</span>
+                      <span class="data-card__chip data-card__chip--pendiente">{{ r.estado }}</span>
+                    </div>
+                    <p class="data-card__dates">
+                      <span class="data-card__date">{{ r.fechaInicio }}</span>
+                      <span class="data-card__arrow" aria-hidden="true">→</span>
+                      <span class="data-card__date">{{ r.fechaFin }}</span>
+                    </p>
+                    <p class="data-card__noches">
+                      <strong>{{ r.noches }}</strong> noche{{ r.noches !== 1 ? 's' : '' }}
+                    </p>
+                    <button
+                      type="button"
+                      class="btn btn--sm btn--danger"
+                      [disabled]="loading()"
+                      (click)="cancelarReserva(r.id)"
+                    >
+                      Cancelar reserva
+                    </button>
+                  </article>
+                }
+              </div>
+            }
+          </article>
+        }
+
       </main>
 
+      <!-- ——— ASIDE ——— -->
       <aside class="prop-aside" aria-label="Resumen">
         <div class="aside-card">
           <h3 class="aside-card__title">Resumen rápido</h3>
           @if (codigoActivo() != null) {
             <dl class="aside-dl">
-              <div>
-                <dt>Paquetes</dt>
-                <dd>{{ paquetes().length }}</dd>
-              </div>
+              <div><dt>Paquetes</dt><dd>{{ paquetes().length }}</dd></div>
               <div>
                 <dt>Dormitorios</dt>
                 <dd>
@@ -656,6 +580,10 @@
                   }
                 </dd>
               </div>
+              <div><dt>Reservas pendientes</dt><dd>{{ reservasPendientes().length }}</dd></div>
+              @if (notificaciones().length > 0) {
+                <div><dt>⚠️ Notificaciones</dt><dd>{{ notificaciones().length }}</dd></div>
+              }
             </dl>
             <p class="aside-card__hint">Los datos se actualizan al elegir una casa o tras guardar cambios.</p>
           } @else {

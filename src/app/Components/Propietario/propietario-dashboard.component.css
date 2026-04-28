@@ -52,11 +52,7 @@
   font-weight: 600;
   color: var(--text-700, #374151);
   cursor: pointer;
-  transition:
-    background 0.18s ease,
-    border-color 0.18s ease,
-    box-shadow 0.18s ease,
-    transform 0.12s ease;
+  transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
 }
 
 .prop-nav-btn:hover {
@@ -169,10 +165,7 @@
   border-radius: 999px;
   font-size: 0.85rem;
   cursor: pointer;
-  transition:
-    background 0.18s ease,
-    border-color 0.18s ease,
-    box-shadow 0.18s ease;
+  transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .prop-chip:hover {
@@ -216,10 +209,7 @@
   font-weight: 600;
   color: var(--text-700);
   cursor: pointer;
-  transition:
-    background 0.18s ease,
-    border-color 0.18s ease,
-    box-shadow 0.18s ease;
+  transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .prop-tab:hover {
@@ -284,7 +274,7 @@
   color: var(--text-600);
 }
 
-/* ——— Work area: content + aside ——— */
+/* ——— Work area ——— */
 .prop-work {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(200px, 260px);
@@ -461,9 +451,7 @@ select {
   padding: 0.55rem 0.7rem;
   font: inherit;
   background: #fff;
-  transition:
-    border-color 0.18s ease,
-    box-shadow 0.18s ease;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 textarea {
@@ -568,11 +556,7 @@ select:focus {
   border-radius: 10px;
   padding: 0.55rem 1rem;
   cursor: pointer;
-  transition:
-    background 0.18s ease,
-    border-color 0.18s ease,
-    box-shadow 0.18s ease,
-    transform 0.1s ease;
+  transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, transform 0.1s ease;
 }
 
 .btn:active:not(:disabled) {
@@ -656,6 +640,24 @@ select:focus {
   width: 100%;
 }
 
+/* Botón de cancelar reserva */
+.btn--danger {
+  border: 1px solid rgba(185, 28, 28, 0.4);
+  background: rgba(254, 242, 242, 0.9);
+  color: #991b1b;
+}
+
+.btn--danger:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: rgba(185, 28, 28, 0.65);
+  box-shadow: 0 2px 8px rgba(185, 28, 28, 0.15);
+}
+
+.btn--danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .form-actions {
   margin-top: 1rem;
   display: flex;
@@ -671,7 +673,7 @@ select:focus {
   margin-top: 1.5rem;
 }
 
-/* ——— Data cards (paquetes, dormitorios, cocinas) ——— */
+/* ——— Data cards ——— */
 .data-grid {
   display: grid;
   gap: 0.75rem;
@@ -690,6 +692,10 @@ select:focus {
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
 }
 
+.data-grid--reservas {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
 .data-card {
   border: 1px solid rgba(31, 41, 55, 0.08);
   border-radius: 14px;
@@ -701,6 +707,14 @@ select:focus {
 
 .data-card:hover {
   box-shadow: 0 4px 18px rgba(107, 142, 35, 0.12);
+}
+
+.data-card--reserva {
+  background: linear-gradient(180deg, rgba(254, 242, 242, 0.4) 0%, #fff 40%);
+}
+
+.data-card--reserva:hover {
+  box-shadow: 0 4px 18px rgba(185, 28, 28, 0.1);
 }
 
 .data-card__head {
@@ -729,6 +743,12 @@ select:focus {
   color: var(--rural-green-dark);
 }
 
+.data-card__chip--pendiente {
+  background: rgba(251, 191, 36, 0.2);
+  color: #92400e;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+}
+
 .data-card__dates {
   display: flex;
   flex-wrap: wrap;
@@ -753,6 +773,12 @@ select:focus {
   font-size: 1.25rem;
   font-weight: 800;
   color: var(--rural-earth);
+}
+
+.data-card__noches {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+  color: var(--text-600);
 }
 
 .data-card__unit {
@@ -831,6 +857,50 @@ select:focus {
   background: rgba(107, 114, 128, 0.12);
   color: #4b5563;
   border: 1px solid rgba(107, 114, 128, 0.2);
+}
+
+/* ——— Notificaciones de reservas expiradas ——— */
+.reserva-notif {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  margin-bottom: 0.65rem;
+}
+
+.reserva-notif__icon {
+  font-size: 1.15rem;
+  flex-shrink: 0;
+  margin-top: 0.05rem;
+}
+
+.reserva-notif__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.reserva-notif__msg {
+  margin: 0 0 0.3rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #78350f;
+}
+
+.reserva-notif__meta {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-600);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.reserva-notif__sep {
+  color: var(--text-400, #9ca3af);
 }
 
 /* ——— Lists ——— */
