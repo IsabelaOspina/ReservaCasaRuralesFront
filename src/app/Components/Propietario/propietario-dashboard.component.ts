@@ -333,6 +333,7 @@ export class PropietarioDashboardComponent {
     return true;
   }
 
+
   protected readonly tiposAlquiler = [
     TipoAlquiler.CASA_COMPLETA,
     TipoAlquiler.POR_HABITACIONES,
@@ -744,11 +745,67 @@ export class PropietarioDashboardComponent {
         },
       });
   }
+protected eliminarCasaActiva(): void {
+  this.clearMessages();
+
+  const codigo = this.codigoActivo();
+
+  if (codigo == null) {
+    this.error.set('No hay una casa seleccionada.');
+    return;
+  }
+
+  const confirmar = confirm(
+    '¿Seguro que deseas eliminar esta casa rural? Esta acción no se puede deshacer.'
+  );
+
+  if (!confirmar) return;
+
+  this.loading.set(true);
+
+  this.casaService.eliminarCasa(codigo).subscribe({
+    next: () => {
+      this.loading.set(false);
+
+      // quitar la casa del listado local
+      const casasActualizadas = this
+        .casasLocales()
+        .filter(c => c.codigoCasa !== codigo);
+
+      this.persistCasas(casasActualizadas);
+
+      // limpiar datos asociados
+      this.paquetes.set([]);
+      this.dormitorios.set([]);
+      this.cocinas.set([]);
+      this.casaActivaDetalle.set(null);
+      this.ultimaAlta.set(null);
+
+      // si quedan casas seleccionar otra
+      if (casasActualizadas.length > 0) {
+        const siguienteCasa = casasActualizadas[0].codigoCasa;
+        this.codigoActivo.set(siguienteCasa);
+        this.refrescarListas(siguienteCasa);
+      } else {
+        this.codigoActivo.set(null);
+      }
+
+      this.success.set('Casa eliminada correctamente.');
+    },
+
+    error: (err: HttpErrorResponse) => {
+      this.loading.set(false);
+      this.error.set(readApiError(err));
+    }
+  });
+}
 
   protected logout() {
     localStorage.removeItem('token');
     void this.router.navigateByUrl('/login');
   }
+
+
 
   protected clearMessages() {
     this.error.set(null);

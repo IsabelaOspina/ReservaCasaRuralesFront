@@ -79,7 +79,24 @@
         }
       </div>
       <div class="prop-header__actions">
-        <button type="button" class="btn btn--outline" (click)="logout()">Cerrar sesión</button>
+        <button
+          type="button"
+          class="btn btn--outline"
+          (click)="logout()"
+        >
+          Cerrar sesión
+        </button>
+
+        @if (codigoActivo() != null) {
+        <button
+          type="button"
+          class="btn btn--danger"
+          (click)="eliminarCasaActiva()"
+          [disabled]="loading()"
+        >
+          {{ loading() ? 'Eliminando...' : 'Eliminar casa' }}
+        </button>
+        }
       </div>
     </header>
 
