@@ -91,7 +91,7 @@
         <button
           type="button"
           class="btn btn--danger"
-          (click)="eliminarCasaActiva()"
+          (click)="abrirModalEliminar()"
           [disabled]="loading()"
         >
           {{ loading() ? 'Eliminando...' : 'Eliminar casa' }}
@@ -682,4 +682,24 @@
       </aside>
     </div>
   </div>
+
+  <!-- Modal de confirmación de eliminación -->
+  @if (modalEliminarAbierta()) {
+    <div class="prop-modal" role="dialog" aria-modal="true" aria-label="Confirmar eliminación">
+      <div class="prop-modal__backdrop" (click)="cerrarModalEliminar()"></div>
+      <div class="prop-modal__panel">
+        <header class="prop-modal__head">
+          <h2 class="prop-modal__title">Confirmar eliminación</h2>
+          <button class="prop-modal__close" type="button" (click)="cerrarModalEliminar()" aria-label="Cerrar">×</button>
+        </header>
+        <div class="prop-modal__body">
+          <p>¿Seguro que deseas eliminar esta casa rural? Esta acción no se puede deshacer.</p>
+        </div>
+        <footer class="prop-modal__foot">
+          <button type="button" class="btn btn--outline" (click)="cerrarModalEliminar()">Cancelar</button>
+          <button type="button" class="btn btn--danger" (click)="confirmarEliminarCasa()" [disabled]="loading()">{{ loading() ? 'Eliminando…' : 'Eliminar definitivamente' }}</button>
+        </footer>
+      </div>
+    </div>
+  }
 </div>

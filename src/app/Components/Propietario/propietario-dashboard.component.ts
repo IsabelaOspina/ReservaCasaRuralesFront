@@ -94,6 +94,8 @@ export class PropietarioDashboardComponent {
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly success = signal<string | null>(null);
+  /** Modal de confirmación para eliminar casa */
+  protected readonly modalEliminarAbierta = signal(false);
 
   /** Valores iniciales vacíos; tras registrar una casa se resetea a vacío (no a «3,2,1…» que parecían datos viejos). */
   protected readonly casaForm = this.fb.group({
@@ -745,60 +747,54 @@ export class PropietarioDashboardComponent {
         },
       });
   }
-protected eliminarCasaActiva(): void {
-  this.clearMessages();
-
-  const codigo = this.codigoActivo();
-
-  if (codigo == null) {
-    this.error.set('No hay una casa seleccionada.');
-    return;
+  protected abrirModalEliminar(): void {
+    // abrir modal de confirmación
+    this.modalEliminarAbierta.set(true);
   }
-
-  const confirmar = confirm(
-    '¿Seguro que deseas eliminar esta casa rural? Esta acción no se puede deshacer.'
-  );
-
-  if (!confirmar) return;
-
-  this.loading.set(true);
-
-  this.casaService.eliminarCasa(codigo).subscribe({
-    next: () => {
-      this.loading.set(false);
-
-      // quitar la casa del listado local
-      const casasActualizadas = this
-        .casasLocales()
-        .filter(c => c.codigoCasa !== codigo);
-
-      this.persistCasas(casasActualizadas);
-
-      // limpiar datos asociados
-      this.paquetes.set([]);
-      this.dormitorios.set([]);
-      this.cocinas.set([]);
-      this.casaActivaDetalle.set(null);
-      this.ultimaAlta.set(null);
-
-      // si quedan casas seleccionar otra
-      if (casasActualizadas.length > 0) {
-        const siguienteCasa = casasActualizadas[0].codigoCasa;
-        this.codigoActivo.set(siguienteCasa);
-        this.refrescarListas(siguienteCasa);
-      } else {
-        this.codigoActivo.set(null);
-      }
-
-      this.success.set('Casa eliminada correctamente.');
-    },
-
-    error: (err: HttpErrorResponse) => {
-      this.loading.set(false);
-      this.error.set(readApiError(err));
+  protected cerrarModalEliminar(): void {
+    this.modalEliminarAbierta.set(false);
+  }
+  protected confirmarEliminarCasa(): void {
+    // ejecuta el borrado real (misma lógica que antes tras el confirm())
+    this.clearMessages();
+    const codigo = this.codigoActivo();
+    if (codigo == null) {
+      this.error.set('No hay una casa seleccionada.');
+      this.cerrarModalEliminar();
+      return;
     }
-  });
-}
+    this.modalEliminarAbierta.set(false);
+    this.loading.set(true);
+    this.casaService.eliminarCasa(codigo).subscribe({
+      next: () => {
+        this.loading.set(false);
+        // quitar la casa del listado local
+        const casasActualizadas = this
+          .casasLocales()
+          .filter(c => c.codigoCasa !== codigo);
+        this.persistCasas(casasActualizadas);
+        // limpiar datos asociados
+        this.paquetes.set([]);
+        this.dormitorios.set([]);
+        this.cocinas.set([]);
+        this.casaActivaDetalle.set(null);
+        this.ultimaAlta.set(null);
+        // si quedan casas seleccionar otra
+        if (casasActualizadas.length > 0) {
+          const siguienteCasa = casasActualizadas[0].codigoCasa;
+          this.codigoActivo.set(siguienteCasa);
+          void this.refrescarListas(siguienteCasa);
+        } else {
+          this.codigoActivo.set(null);
+        }
+        this.success.set('Casa eliminada correctamente.');
+      },
+      error: (err: HttpErrorResponse) => {
+        this.loading.set(false);
+        this.error.set(readApiError(err));
+      },
+    });
+  }
 
   protected logout() {
     localStorage.removeItem('token');

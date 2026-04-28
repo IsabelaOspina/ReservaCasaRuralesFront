@@ -45,6 +45,12 @@ export class CasaRuralService {
       .pipe(map((raw) => normalizeCasaRuralResponse(raw)));
   }
 
+  eliminarCasa(codigoCasa: number): Observable<{ mensaje: string }> {
+    return this.http.delete<{ mensaje: string }>(
+      `${this.apiUrl}/${codigoCasa}`
+    );
+  }
+
   /**
    * Listado público de casas (ajusta la ruta si tu controlador usa otro mapping).
    * Ej. GET /casa_rural/listar
