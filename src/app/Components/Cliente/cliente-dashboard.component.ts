@@ -253,6 +253,13 @@ export class ClienteDashboardComponent {
     this.refrescarListadoCompleto();
   }
 
+  /** Elimina una casa del catálogo local del cliente. */
+  private eliminarDelCatalogo(codigoCasa: number) {
+    const list = this.readCatalogo().filter((x) => x.codigoCasa !== codigoCasa);
+    this.persistCatalogo(list);
+    this.refrescarListadoCompleto();
+  }
+
   /**
    * Casas guardadas localmente por cualquier sesión de propietario en este navegador
    * (clave `propietario_casas` o `propietario_casas_<usuario>`). Solo afecta al catálogo cliente;
