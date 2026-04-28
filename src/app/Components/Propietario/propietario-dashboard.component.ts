@@ -773,6 +773,8 @@ export class PropietarioDashboardComponent {
           .casasLocales()
           .filter(c => c.codigoCasa !== codigo);
         this.persistCasas(casasActualizadas);
+        // eliminar la casa también del catálogo del cliente (localStorage)
+        this.eliminarDelCatalogoCliente(codigo);
         // limpiar datos asociados
         this.paquetes.set([]);
         this.dormitorios.set([]);
@@ -794,6 +796,21 @@ export class PropietarioDashboardComponent {
         this.error.set(readApiError(err));
       },
     });
+  }
+
+  /** Elimina una casa del catálogo local del cliente en localStorage. */
+  private eliminarDelCatalogoCliente(codigoCasa: number): void {
+    try {
+      const catalogoKey = 'cliente_catalogo_casas';
+      const catalogo = localStorage.getItem(catalogoKey);
+      if (catalogo) {
+        const list = JSON.parse(catalogo) as Array<{ codigoCasa: number }>;
+        const filtered = list.filter((x) => x.codigoCasa !== codigoCasa);
+        localStorage.setItem(catalogoKey, JSON.stringify(filtered));
+      }
+    } catch {
+      // ignorar errores de localStorage
+    }
   }
 
   protected logout() {
