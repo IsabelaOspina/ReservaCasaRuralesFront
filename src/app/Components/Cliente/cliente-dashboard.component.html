@@ -176,54 +176,67 @@
       <div class="cli__two-col" id="sec-disponibilidad">
         <section class="cli__card">
           <h2 class="cli__h2"><span class="cli__num">2</span> Disponibilidad</h2>
-          @if (msgDisp(); as md) {
-            <p
-              id="cli-feedback-disp"
-              class="cli__alert"
-              [class.cli__alert--err]="md.tipo === 'err'"
-              [class.cli__alert--ok]="md.tipo === 'ok'"
-              role="alert"
-            >
-              {{ md.texto }}
-            </p>
-          }
-          <form [formGroup]="dispForm" (ngSubmit)="verificarDisponibilidad()">
-            <div class="cli__grid2">
-              <label class="cli__field">
-                <span class="cli__label">Fecha de inicio</span>
-                <input
-                  type="date"
-                  formControlName="fechaInicio"
-                  [class.cli__input--invalid]="fieldState('disp', 'fechaInicio') === 'invalid'"
-                  [class.cli__input--valid]="fieldState('disp', 'fechaInicio') === 'valid'"
-                />
-                @if (dispForm.get('fechaInicio')?.invalid && (dispForm.get('fechaInicio')?.touched || dispForm.get('fechaInicio')?.dirty)) {
-                  <span class="cli__err">Indica una fecha.</span>
+          @if (codigoCasa() == null) {
+            <p class="cli__muted">Selecciona una casa para ver el calendario.</p>
+          } @else if (loadingOcupacion()) {
+            <p class="cli__muted cli__loading-inline">Cargando calendario…</p>
+          } @else {
+            <div class="cli__cal">
+              <div class="cli__cal-head">
+                <button type="button" class="cli__cal-arrow" (click)="mesAnterior()" aria-label="Mes anterior">‹</button>
+                <span class="cli__cal-title">{{ nombreMes() }}</span>
+                <button type="button" class="cli__cal-arrow" (click)="mesSiguiente()" aria-label="Mes siguiente">›</button>
+              </div>
+              <div class="cli__cal-grid">
+                <span class="cli__cal-wday">Lun</span>
+                <span class="cli__cal-wday">Mar</span>
+                <span class="cli__cal-wday">Mié</span>
+                <span class="cli__cal-wday">Jue</span>
+                <span class="cli__cal-wday">Vie</span>
+                <span class="cli__cal-wday">Sáb</span>
+                <span class="cli__cal-wday">Dom</span>
+                @for (_ of [].constructor(primerDiaSemanaLunes()); track $index) {
+                  <span class="cli__cal-empty"></span>
                 }
-              </label>
-              <label class="cli__field">
-                <span class="cli__label">Noches</span>
-                <input
-                  type="number"
-                  min="1"
-                  formControlName="noches"
-                  [class.cli__input--invalid]="fieldState('disp', 'noches') === 'invalid'"
-                  [class.cli__input--valid]="fieldState('disp', 'noches') === 'valid'"
-                />
-                @if (dispForm.get('noches')?.invalid && (dispForm.get('noches')?.touched || dispForm.get('noches')?.dirty)) {
-                  <span class="cli__err">Mínimo 1 noche.</span>
+                @for (d of diasDelMes(); track d.dia) {
+                  @if (d.fueraPaquete) {
+                    <span class="cli__cal-day cli__cal-day--fuera" title="Sin paquete activo">
+                      {{ d.dia }}
+                    </span>
+                  } @else if (d.ocupado) {
+                    <span
+                      class="cli__cal-day cli__cal-day--ocupado"
+                      [class.cli__cal-day--pendiente]="d.estado === 'PENDIENTE'"
+                      [class.cli__cal-day--confirmada]="d.estado === 'CONFIRMADA'"
+                      [title]="d.estado === 'PENDIENTE' ? 'Pendiente de confirmación' : 'Confirmada'"
+                    >
+                      {{ d.dia }}
+                    </span>
+                  } @else {
+                    <button
+                      type="button"
+                      class="cli__cal-day cli__cal-day--libre"
+                      [class.cli__cal-day--sel]="esFechaSeleccionada(d.dia)"
+                      (click)="seleccionarDiaCalendario(d.dia)"
+                    >
+                      {{ d.dia }}
+                    </button>
+                  }
                 }
-              </label>
+              </div>
+              <div class="cli__cal-legend">
+                <span class="cli__cal-legend-item"><span class="cli__cal-dot cli__cal-dot--libre"></span> Libre</span>
+                <span class="cli__cal-legend-item"><span class="cli__cal-dot cli__cal-dot--pendiente"></span> Pendiente</span>
+                <span class="cli__cal-legend-item"><span class="cli__cal-dot cli__cal-dot--confirmada"></span> Confirmada</span>
+                <span class="cli__cal-legend-item"><span class="cli__cal-dot cli__cal-dot--sel"></span> Seleccionada</span>
+                <span class="cli__cal-legend-item"><span class="cli__cal-dot cli__cal-dot--fuera"></span> Sin paquete</span>
+              </div>
             </div>
-            <button type="submit" class="cli__btn cli__btn--primary" [disabled]="!canComprobarDisponibilidad()">
-              {{ loadingDisp() ? 'Comprobando…' : 'Comprobar disponibilidad' }}
-            </button>
-          </form>
-          @if (disponibilidadResult(); as dr) {
-            <p class="cli__disp" [class.cli__disp--ok]="dr.ok" [class.cli__disp--bad]="!dr.ok" role="status">
-              {{ dr.ok ? 'La casa está disponible para estas fechas.' : 'No hay disponibilidad, prueba con otras fechas.' }}
-              — {{ dr.msg }}
-            </p>
+            @if (dispForm.getRawValue().fechaInicio) {
+              <p class="cli__cal-selection">
+                Fecha seleccionada: <strong>{{ dispForm.getRawValue().fechaInicio }}</strong>
+              </p>
+            }
           }
         </section>
 
@@ -372,7 +385,7 @@
         }
       </section>
 
-      <!-- Mis reservas -->
+<!-- Mis reservas -->
       <section class="cli__card" id="sec-misreservas">
         <h2 class="cli__h2"><span class="cli__num">&#128203;</span> Mis reservas</h2>
         <button type="button" class="cli__btn cli__btn--primary" (click)="cargarMisReservas()" [disabled]="loadingMisReservas()">

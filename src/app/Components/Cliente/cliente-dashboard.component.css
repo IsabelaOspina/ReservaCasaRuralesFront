@@ -1196,3 +1196,228 @@
   color: #7f1d1d;
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
+/* -- Calendario de Ocupación -- */
+.cli__ocupacion-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-top: 1.2rem;
+}
+
+.cli__ocupacion-card {
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid rgba(160, 82, 45, 0.16);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+}
+
+.cli__ocupacion-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.cli__ocupacion-card__id {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-600);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.cli__ocupacion-card__price {
+  margin-left: auto;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--rural-green-dark);
+}
+
+.cli__ocupacion-card__range {
+  font-size: 0.9rem;
+  color: var(--text-700);
+  margin-bottom: 0.5rem;
+}
+
+.cli__ocupacion-card__free {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #14532d;
+}
+
+.cli__ocupacion-periodos {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.cli__ocupacion-periodo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.06);
+  font-size: 0.85rem;
+  color: var(--text-700);
+}
+/* -- Calendario visual -- */
+.cli__cal {
+  margin-top: 0.8rem;
+}
+
+.cli__cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+
+.cli__cal-title {
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: capitalize;
+  color: var(--text-800);
+}
+
+.cli__cal-arrow {
+  background: none;
+  border: 1px solid rgba(160, 82, 45, 0.2);
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: var(--text-600);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.cli__cal-arrow:hover {
+  background: rgba(160, 82, 45, 0.08);
+}
+
+.cli__cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.cli__cal-wday {
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-500);
+  padding: 0.3rem 0;
+}
+
+.cli__cal-empty {
+  /* celda vacía antes del primer día del mes */
+}
+
+.cli__cal-day {
+  text-align: center;
+  padding: 0.45rem 0;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: none;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.cli__cal-day--libre {
+  background: rgba(34, 197, 94, 0.10);
+  color: #14532d;
+  cursor: pointer;
+}
+
+.cli__cal-day--libre:hover {
+  background: rgba(34, 197, 94, 0.25);
+  transform: scale(1.08);
+}
+
+.cli__cal-day--sel {
+  background: rgba(59, 130, 246, 0.22) !important;
+  color: #1e3a8a;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+}
+
+.cli__cal-day--ocupado {
+  cursor: not-allowed;
+  opacity: 0.9;
+}
+
+.cli__cal-day--pendiente {
+  background: rgba(234, 179, 8, 0.22);
+  color: #713f12;
+}
+
+.cli__cal-day--confirmada {
+  background: rgba(239, 68, 68, 0.18);
+  color: #7f1d1d;
+}
+
+.cli__cal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin-top: 0.7rem;
+  font-size: 0.78rem;
+  color: var(--text-600);
+}
+
+.cli__cal-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.cli__cal-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+}
+
+.cli__cal-dot--libre {
+  background: rgba(34, 197, 94, 0.25);
+}
+
+.cli__cal-dot--pendiente {
+  background: rgba(234, 179, 8, 0.35);
+}
+
+.cli__cal-dot--confirmada {
+  background: rgba(239, 68, 68, 0.3);
+}
+
+.cli__cal-dot--sel {
+  background: rgba(59, 130, 246, 0.35);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.5);
+}
+
+.cli__cal-selection {
+  margin-top: 0.7rem;
+  font-size: 0.88rem;
+  color: var(--text-700);
+}
+/* Días fuera de cualquier paquete */
+.cli__cal-day--fuera {
+  background: rgba(0, 0, 0, 0.04);
+  color: rgba(0, 0, 0, 0.28);
+  cursor: default;
+}
+
+.cli__cal-dot--fuera {
+  background: rgba(0, 0, 0, 0.12);
+}

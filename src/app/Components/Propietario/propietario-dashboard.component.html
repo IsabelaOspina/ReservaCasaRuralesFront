@@ -248,6 +248,9 @@
                     <button type="button" class="btn btn--sm btn--secondary" (click)="rellenarEdicionPaquete(p)">
                       Editar en formulario
                     </button>
+                    <button type="button" class="btn btn--sm btn--outline" (click)="iniciarDivision(p)">
+                      Dividir
+                    </button>
                   </article>
                 }
               </div>
@@ -298,7 +301,42 @@
               </div>
             </form>
 
-            <h3 class="card__subtitle">Actualizar paquete</h3>
+                        @if (paqueteDividirId() !== null) {
+              <div class="card__form-block dividir-section">
+                <h3 class="card__subtitle">Dividir paquete #{{ paqueteDividirId() }}</h3>
+                <p class="card__help">Define los sub-paquetes. Deben estar dentro del rango del paquete original.</p>
+                @for (sub of dividirSubPaquetes(); track $index; let i = $index) {
+                  <div class="form-grid dividir-row">
+                    <label class="form-field">
+                      <span class="form-label">Inicio</span>
+                      <input type="date" [value]="sub.fechaInicio"
+                             (input)="actualizarSubPaquete(i, 'fechaInicio', $any($event.target).value)" />
+                    </label>
+                    <label class="form-field">
+                      <span class="form-label">Fin</span>
+                      <input type="date" [value]="sub.fechaFin"
+                             (input)="actualizarSubPaquete(i, 'fechaFin', $any($event.target).value)" />
+                    </label>
+                    <label class="form-field">
+                      <span class="form-label">Precio/noche</span>
+                      <input type="number" step="0.01" min="0.01" [value]="sub.precio"
+                             (input)="actualizarSubPaquete(i, 'precio', $any($event.target).value)" />
+                    </label>
+                    @if (dividirSubPaquetes().length > 2) {
+                      <button type="button" class="btn btn--sm btn--danger" (click)="quitarSubPaquete(i)">Quitar</button>
+                    }
+                  </div>
+                }
+                <div class="form-actions form-actions--row">
+                  <button type="button" class="btn btn--sm btn--secondary" (click)="agregarSubPaquete()">+ A&ntilde;adir sub-paquete</button>
+                  <button type="button" class="btn btn--primary" (click)="ejecutarDivision()" [disabled]="loadingDividir()">
+                    {{ loadingDividir() ? 'Dividiendo...' : 'Confirmar divisi&oacute;n' }}
+                  </button>
+                  <button type="button" class="btn btn--sm btn--outline" (click)="cancelarDivision()">Cancelar</button>
+                </div>
+              </div>
+            }
+<h3 class="card__subtitle">Actualizar paquete</h3>
             <p class="card__help">Usa «Editar en formulario» en una tarjeta superior para rellenar los datos.</p>
             <form [formGroup]="paqueteEditForm" (ngSubmit)="actualizarPaquete()" class="card__form-block">
               <div class="form-grid">

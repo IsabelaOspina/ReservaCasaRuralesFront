@@ -1029,3 +1029,53 @@ select:focus {
 
 /* Modal de confirmación (propietario) */
 .prop-modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:1100}.prop-modal__backdrop{position:absolute;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(4px)saturate(1.05)}.prop-modal__panel{position:relative;z-index:1101;width:min(540px,calc(100% - 48px));background:linear-gradient(180deg,#fff 0%,rgba(245,245,220,.95) 100%);border-radius:12px;box-shadow:0 12px 40px rgba(2,6,23,.45);border:1px solid rgba(31,41,55,.06);overflow:hidden}.prop-modal__head{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid rgba(31,41,55,.04)}.prop-modal__title{margin:0;font-size:1.05rem;color:var(--rural-earth);font-weight:700}.prop-modal__close{border:none;background:rgba(0,0,0,.06);width:2rem;height:2rem;border-radius:8px;font-size:1.2rem;line-height:1;cursor:pointer;color:var(--text-700)}.prop-modal__body{padding:1rem 1.25rem;color:var(--text-700);font-size:.98rem}.prop-modal__foot{display:flex;gap:.6rem;padding:.85rem 1.25rem 1rem;justify-content:flex-end;border-top:1px solid rgba(31,41,55,.03)}.prop-modal__foot .btn--outline{padding:.5rem .9rem}.prop-modal__foot .btn--danger{padding:.5rem .95rem}@media(max-width:480px){.prop-modal__panel{width:calc(100% - 28px);border-radius:10px}.prop-modal__head{padding:.9rem 1rem}.prop-modal__body{padding:.9rem 1rem}.prop-modal__foot{padding:.7rem 1rem}}
+
+/* -- Dividir paquete -- */
+.dividir-section {
+  border-top: 2px dashed rgba(160, 82, 45, 0.2);
+  padding-top: 1rem;
+  margin-top: 1rem;
+}
+
+.dividir-row {
+  padding: 0.6rem 0;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+
+.form-actions--row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  margin-top: 0.8rem;
+}
+
+.btn--outline {
+  background: transparent;
+  color: var(--text-600);
+  border: 1px solid rgba(160, 82, 45, 0.3);
+  border-radius: 8px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn--outline:hover {
+  background: rgba(160, 82, 45, 0.06);
+}
+
+.btn--danger {
+  background: rgba(239, 68, 68, 0.12);
+  color: #991b1b;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn--danger:hover {
+  background: rgba(239, 68, 68, 0.22);
+}

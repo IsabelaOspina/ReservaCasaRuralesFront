@@ -34,6 +34,7 @@ import { TipoAlquiler } from '../../DTO/paquete-request';
 import { DormitorioResponse } from '../../DTO/Dormitorio-response';
 import { CocinaResponse } from '../../DTO/Cocina-response';
 import { TipoCama } from '../../DTO/Dormitorio-request';
+import { DividirPaqueteRequest, SubPaqueteRequest } from '../../DTO/dividir-paquete-request';
 import { ReservaResponse } from '../../DTO/reserva-response';
 import { NotificacionResponse } from '../../DTO/notificacion-response';
 
@@ -93,6 +94,10 @@ export class PropietarioDashboardComponent {
   // ——— Reservas ———
   protected readonly reservasPendientes = signal<ReservaResponse[]>([]);
   protected readonly notificaciones = signal<NotificacionResponse[]>([]);
+
+  protected readonly paqueteDividirId = signal<number | null>(null);
+  protected readonly dividirSubPaquetes = signal<SubPaqueteRequest[]>([]);
+  protected readonly loadingDividir = signal(false);
 
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -742,6 +747,62 @@ export class PropietarioDashboardComponent {
     } catch {
       // ignorar errores de localStorage
     }
+  }
+
+  protected iniciarDivision(p: { idPaquete: number; fechaInicio: string; fechaFin: string; tipoAlquiler: any }) {
+    this.clearMessages();
+    this.paqueteDividirId.set(p.idPaquete);
+    const mid = p.fechaInicio;
+    this.dividirSubPaquetes.set([
+      { fechaInicio: p.fechaInicio, fechaFin: '', precio: 0, tipoAlquiler: p.tipoAlquiler },
+      { fechaInicio: '', fechaFin: p.fechaFin, precio: 0, tipoAlquiler: p.tipoAlquiler },
+    ]);
+  }
+
+  protected cancelarDivision() {
+    this.paqueteDividirId.set(null);
+    this.dividirSubPaquetes.set([]);
+  }
+
+  protected agregarSubPaquete() {
+    const orig = this.paquetes().find(p => p.idPaquete === this.paqueteDividirId());
+    this.dividirSubPaquetes.set([
+      ...this.dividirSubPaquetes(),
+      { fechaInicio: '', fechaFin: '', precio: 0, tipoAlquiler: orig?.tipoAlquiler ?? undefined },
+    ]);
+  }
+
+  protected quitarSubPaquete(i: number) {
+    const arr = [...this.dividirSubPaquetes()];
+    arr.splice(i, 1);
+    this.dividirSubPaquetes.set(arr);
+  }
+
+  protected actualizarSubPaquete(i: number, campo: keyof SubPaqueteRequest, valor: any) {
+    const arr = [...this.dividirSubPaquetes()];
+    arr[i] = { ...arr[i], [campo]: campo === 'precio' ? Number(valor) : valor };
+    this.dividirSubPaquetes.set(arr);
+  }
+
+  protected ejecutarDivision() {
+    this.clearMessages();
+    const id = this.paqueteDividirId();
+    if (id == null) return;
+    this.loadingDividir.set(true);
+    const body: DividirPaqueteRequest = { subPaquetes: this.dividirSubPaquetes() };
+    this.paqueteService.dividirPaquete(id, body).subscribe({
+      next: () => {
+        this.loadingDividir.set(false);
+        this.success.set('Paquete dividido correctamente.');
+        this.cancelarDivision();
+        const c = this.codigoActivo();
+        if (c != null) void this.refrescarListas(c);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.loadingDividir.set(false);
+        this.error.set(readApiError(err));
+      },
+    });
   }
 
   protected logout() {

@@ -5,6 +5,8 @@ import { environment } from '../../environments/environment';
 
 import { PaqueteAlquilerRequest } from '../DTO/paquete-request';
 import { PaqueteAlquilerResponse } from '../DTO/paquete-response';
+import { OcupacionPaqueteResponse } from '../DTO/ocupacion-response';
+import { DividirPaqueteRequest } from '../DTO/dividir-paquete-request';
 
 @Injectable({
   providedIn: 'root'
@@ -48,6 +50,30 @@ export class PaqueteAlquilerService {
   listarPaquetesPorCasa(codigoCasa: number): Observable<PaqueteAlquilerResponse[]> {
     return this.http.get<PaqueteAlquilerResponse[]>(
       `${this.apiUrl}/casa/${codigoCasa}`
+    );
+  }
+
+  /**
+   * Obtener calendario de ocupación de los paquetes de una casa
+   * @param codigoCasa - ID de la casa
+   * @returns Observable con la lista de paquetes y sus periodos ocupados
+   */
+  obtenerOcupacionPorCasa(codigoCasa: number): Observable<OcupacionPaqueteResponse[]> {
+    return this.http.get<OcupacionPaqueteResponse[]>(
+      `${this.apiUrl}/casa/${codigoCasa}/ocupacion`
+    );
+  }
+
+  /**
+   * Dividir un paquete en sub-paquetes más pequeños
+   * @param idPaquete - ID del paquete a dividir
+   * @param data - Datos con los sub-paquetes
+   * @returns Observable con la lista de paquetes creados
+   */
+  dividirPaquete(idPaquete: number, data: DividirPaqueteRequest): Observable<PaqueteAlquilerResponse[]> {
+    return this.http.post<PaqueteAlquilerResponse[]>(
+      `${this.apiUrl}/${idPaquete}/dividir`,
+      data
     );
   }
 }
