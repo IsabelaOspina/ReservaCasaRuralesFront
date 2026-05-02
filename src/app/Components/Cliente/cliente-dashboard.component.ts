@@ -137,6 +137,13 @@ export class ClienteDashboardComponent {
     codigo: [1, [Validators.required, Validators.min(1)]],
   });
 
+  protected readonly buscarPoblacionForm = this.fb.nonNullable.group({
+    poblacion: [''],
+  });
+
+  protected readonly loadingBusquedaPoblacion = signal(false);
+  protected readonly modoListadoCasas = signal<'general' | 'busqueda'>('general');
+
   protected readonly dispForm = this.fb.nonNullable.group({
     fechaInicio: ['', Validators.required],
     noches: [3, [Validators.required, Validators.min(1)]],
@@ -304,6 +311,27 @@ export class ClienteDashboardComponent {
     return undefined;
   }
 
+  /** Convierte la respuesta de `/casa_rural/buscar` al mismo formato de tarjetas que el listado. */
+  private apiRespuestasACatalogo(api: CasaRuralResponse[]): CasaClienteCatalogo[] {
+    const out: CasaClienteCatalogo[] = [];
+    for (const r of api) {
+      if (!r?.codigoCasa) continue;
+      out.push({
+        codigoCasa: r.codigoCasa,
+        poblacion: r.poblacion?.trim() || `Casa ${r.codigoCasa}`,
+        descripcion: r.descripcion,
+        previewUrl: r.fotos?.[0]?.url,
+        fotos: r.fotos,
+        numeroDormitorios: r.numeroDormitorios,
+        numeroBanos: r.numeroBanos,
+        numeroCocinas: r.numeroCocinas,
+        numeroComedores: r.numeroComedores,
+        plazasGaraje: r.plazasGaraje,
+      });
+    }
+    return out.sort((a, b) => a.codigoCasa - b.codigoCasa);
+  }
+
   private mergeCasasFuente(api: CasaRuralResponse[]): CasaClienteCatalogo[] {
     const map = new Map<number, CasaClienteCatalogo>();
     const add = (c: CasaClienteCatalogo) => {
@@ -348,6 +376,7 @@ export class ClienteDashboardComponent {
   }
 
   private refrescarListadoCompleto() {
+    this.modoListadoCasas.set('general');
     this.loadingListadoCasas.set(true);
     this.casaRuralService.listarCasasDisponibles().subscribe({
       next: (api) => {
@@ -360,6 +389,38 @@ export class ClienteDashboardComponent {
         this.casasListado.set(this.mergeCasasFuente([]));
       },
     });
+  }
+
+  protected buscarCasasPorPoblacion(): void {
+    this.msgCasas.set(null);
+    const q = this.buscarPoblacionForm.getRawValue().poblacion.trim();
+    if (!q) {
+      this.setMsgCasas('err', 'Indica una población para buscar.');
+      this.buscarPoblacionForm.get('poblacion')?.markAsTouched();
+      return;
+    }
+    this.loadingBusquedaPoblacion.set(true);
+    this.casaRuralService.buscarPorPoblacion(q).subscribe({
+      next: (api) => {
+        this.loadingBusquedaPoblacion.set(false);
+        this.modoListadoCasas.set('busqueda');
+        this.casasListado.set(this.apiRespuestasACatalogo(api));
+        if (api.length === 0) {
+          this.setMsgCasas('ok', 'No hay casas que coincidan con esa población.');
+        } else {
+          this.setMsgCasas('ok', `${api.length} casa(s) encontrada(s).`);
+        }
+      },
+      error: (err: HttpErrorResponse) => {
+        this.loadingBusquedaPoblacion.set(false);
+        this.setMsgCasas('err', readApiError(err));
+      },
+    });
+  }
+
+  protected verListadoGeneralCasas(): void {
+    this.buscarPoblacionForm.patchValue({ poblacion: '' });
+    this.refrescarListadoCompleto();
   }
 
   protected idPublicoCasa(codigo: number): string {

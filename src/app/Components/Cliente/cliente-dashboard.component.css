@@ -260,6 +260,14 @@
   scroll-snap-type: x mandatory;
 }
 
+.cli__house-strip-empty {
+  flex: 0 0 100%;
+  width: 100%;
+  text-align: center;
+  padding: 1rem 0.5rem;
+  margin: 0;
+}
+
 .cli__house-card {
   position: relative;
   flex: 0 0 min(260px, 85vw);
@@ -358,6 +366,15 @@
   gap: 0.65rem;
   align-items: flex-end;
   margin-top: 0.5rem;
+}
+
+.cli__buscar-poblacion {
+  margin-top: 0.25rem;
+}
+
+.cli__field--grow {
+  flex: 1 1 12rem;
+  min-width: 0;
 }
 
 .cli__gallery-actions {

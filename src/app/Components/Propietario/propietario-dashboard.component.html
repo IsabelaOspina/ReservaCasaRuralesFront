@@ -59,6 +59,14 @@
       >
         Cocinas
       </button>
+      <button
+        type="button"
+        class="prop-nav-btn"
+        [class.prop-nav-btn--active]="tab() === 'cobros'"
+        (click)="setTab('cobros')"
+      >
+        Cobros reservas
+      </button>
     </nav>
     <a class="prop-sidebar__link" routerLink="/login">Volver al acceso</a>
   </aside>
@@ -136,6 +144,14 @@
         (click)="setTab('cocinas')"
       >
         Cocinas
+      </button>
+      <button
+        type="button"
+        class="prop-tab"
+        [class.prop-tab--active]="tab() === 'cobros'"
+        (click)="setTab('cobros')"
+      >
+        Cobros reservas
       </button>
     </nav>
 
@@ -559,6 +575,148 @@
               <div class="form-actions">
                 <button type="submit" class="btn btn--primary btn--block" [disabled]="!canRegistrarDormitorio()">
                   Registrar dormitorio
+                </button>
+              </div>
+            </form>
+          </article>
+        }
+
+        @if (tab() === 'cobros') {
+          <article class="card">
+            <h2 class="card__title">Registrar cobro recibido</h2>
+            @if (propPagoMensaje(); as pm) {
+              <p
+                class="prop-pago-feedback"
+                [class.prop-pago-feedback--err]="pm.tipo === 'error'"
+                [class.prop-pago-feedback--ok]="pm.tipo === 'success'"
+                role="alert"
+              >
+                {{ pm.texto }}
+              </p>
+            }
+            <form [formGroup]="propPagoForm" class="card__form-block" (ngSubmit)="registrarPagoPropietario()">
+              <div class="form-grid">
+                <label class="form-field">
+                  <span class="form-label">ID reserva</span>
+                  <input
+                    type="number"
+                    min="1"
+                    formControlName="reservaId"
+                    placeholder="Ej. 14"
+                    [class.input--invalid]="fieldStatePropPago('reservaId') === 'invalid'"
+                    [class.input--valid]="fieldStatePropPago('reservaId') === 'valid'"
+                  />
+                  @if (
+                    propPagoForm.get('reservaId')?.invalid &&
+                    (propPagoForm.get('reservaId')?.dirty || propPagoForm.get('reservaId')?.touched)
+                  ) {
+                    <span class="form-error" role="alert">Indica un ID de reserva válido.</span>
+                  }
+                </label>
+                <div class="form-field span-2 prop-pago-actions">
+                  <button
+                    type="button"
+                    class="btn btn--secondary"
+                    (click)="cargarInfoPagoProp()"
+                    [disabled]="loadingPagosProp()"
+                  >
+                    Datos para transferencia
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn--secondary"
+                    (click)="listarPagosReservaProp()"
+                    [disabled]="loadingPagosProp()"
+                  >
+                    Ver pagos de la reserva
+                  </button>
+                </div>
+                @if (propPagoInfo(); as info) {
+                  <div class="prop-pago-summary span-2" role="region" aria-label="Resumen de importes">
+                    <h3 class="card__subtitle">Resumen de importes</h3>
+                    <div class="prop-pago-stats">
+                      <div>
+                        <span class="prop-pago-stat__label">Total a pagar</span>
+                        <span class="prop-pago-stat__value">{{ info.totalAPagar | number: '1.2-2' }} €</span>
+                      </div>
+                      <div>
+                        <span class="prop-pago-stat__label">Anticipo mínimo</span>
+                        <span class="prop-pago-stat__value prop-pago-stat__value--accent">{{
+                          info.anticipoReserva | number: '1.2-2'
+                        }}
+                        €</span>
+                      </div>
+                      <div>
+                        <span class="prop-pago-stat__label">Saldo restante</span>
+                        <span class="prop-pago-stat__value">{{ saldoRestanteProp(info) | number: '1.2-2' }} €</span>
+                      </div>
+                    </div>
+                    <div class="prop-pago-bank">
+                      <span class="prop-pago-bank__head">Datos bancarios</span>
+                      <p><span class="prop-pago-bank__k">Banco</span> {{ info.banco }}</p>
+                      <p>
+                        <span class="prop-pago-bank__k">Cuenta</span>
+                        <code>{{ info.numeroCuenta }}</code>
+                      </p>
+                    </div>
+                  </div>
+                }
+                @if (propPagosLista().length) {
+                  <div class="prop-pago-list span-2" role="region" aria-label="Pagos registrados">
+                    <h3 class="card__subtitle">Pagos de esta reserva</h3>
+                    <ul class="prop-pago-cards">
+                      @for (pg of propPagosLista(); track pg.idPago) {
+                        <li class="prop-pago-card">
+                          <span class="prop-pago-card__id">#{{ pg.idPago }}</span>
+                          <span class="prop-pago-card__amount">{{ pg.monto | number: '1.2-2' }} €</span>
+                          <span class="prop-pago-chip">{{ etiquetaMetodoPagoProp(pg.metodoPago) }}</span>
+                          <span class="prop-pago-chip">{{ pg.fechaPago }}</span>
+                        </li>
+                      }
+                    </ul>
+                  </div>
+                }
+                <h3 class="card__subtitle span-2">Registrar cobro</h3>
+                <label class="form-field">
+                  <span class="form-label">Monto (€)</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    formControlName="monto"
+                    [class.input--invalid]="fieldStatePropPago('monto') === 'invalid'"
+                    [class.input--valid]="fieldStatePropPago('monto') === 'valid'"
+                  />
+                </label>
+                <label class="form-field">
+                  <span class="form-label">Método</span>
+                  <select formControlName="metodoPago">
+                    @for (m of metodosPagoProp; track m) {
+                      <option [ngValue]="m">{{ m }}</option>
+                    }
+                  </select>
+                </label>
+                <label class="form-field span-2">
+                  <span class="form-label">Fecha del cobro (opcional)</span>
+                  <input
+                    type="date"
+                    formControlName="fechaPago"
+                    [attr.min]="fechaMinimaPagoProp()"
+                    [class.input--invalid]="fieldStatePropPago('fechaPago') === 'invalid'"
+                    [class.input--valid]="fieldStatePropPago('fechaPago') === 'valid'"
+                  />
+                  <span class="form-hint">Si la dejas vacía, el servidor usará la fecha actual.</span>
+                  @if (
+                    propPagoForm.get('fechaPago')?.hasError('fechaPagoPasada') &&
+                    (propPagoForm.get('fechaPago')?.dirty || propPagoForm.get('fechaPago')?.touched)
+                  ) {
+                    <span class="form-error" role="alert">La fecha no puede ser anterior a hoy.</span>
+                  }
+                </label>
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn--primary btn--block" [disabled]="!canRegistrarPagoProp()">
+                  {{ loadingPagosProp() ? 'Procesando…' : 'Confirmar cobro en reserva' }}
                 </button>
               </div>
             </form>
