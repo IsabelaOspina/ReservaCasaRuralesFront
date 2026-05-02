@@ -314,6 +314,11 @@
             {{ mr.texto }}
           </p>
         }
+        @if (casaEnteraBloqueada()) {
+          <p class="cli__alert cli__alert--err" role="alert">
+            ❌ Casa entera no disponible: ya hay habitaciones reservadas en este paquete
+          </p>
+        }
         <form [formGroup]="reservaForm" (ngSubmit)="crearReserva()">
           <div class="cli__grid2">
             <label class="cli__field">
@@ -363,7 +368,7 @@
               }
             </label>
           </div>
-          <button type="submit" class="cli__btn cli__btn--primary" [disabled]="!canCrearReserva()">
+          <button type="submit" class="cli__btn cli__btn--primary" [disabled]="!canCrearReserva() || casaEnteraBloqueada()">
             {{ loadingReserva() ? 'Creando…' : 'Crear reserva' }}
           </button>
           @if (precioReservaEstimado(); as est) {
@@ -385,7 +390,7 @@
         }
       </section>
 
-<!-- Mis reservas -->
+      <!-- Mis reservas -->
       <section class="cli__card" id="sec-misreservas">
         <h2 class="cli__h2"><span class="cli__num">&#128203;</span> Mis reservas</h2>
         <button type="button" class="cli__btn cli__btn--primary" (click)="cargarMisReservas()" [disabled]="loadingMisReservas()">
@@ -558,7 +563,7 @@
               @if (
                 pagoForm.get('fechaPago')?.hasError('fechaPagoPasada') &&
                 (pagoForm.get('fechaPago')?.touched || pagoForm.get('fechaPago')?.dirty)
-              ) {
+                ) {
                 <span class="cli__err">La fecha no puede ser anterior a hoy.</span>
               }
             </label>

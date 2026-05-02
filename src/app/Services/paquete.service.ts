@@ -24,7 +24,7 @@ export class PaqueteAlquilerService {
    */
   crearPaquete(codigoCasa: number, data: PaqueteAlquilerRequest): Observable<PaqueteAlquilerResponse> {
     return this.http.post<PaqueteAlquilerResponse>(
-      `${this.apiUrl}/${codigoCasa}/crear`, 
+      `${this.apiUrl}/${codigoCasa}/crear`,
       data
     );
   }
@@ -37,7 +37,7 @@ export class PaqueteAlquilerService {
    */
   actualizarPaquete(idPaquete: number, data: PaqueteAlquilerRequest): Observable<PaqueteAlquilerResponse> {
     return this.http.put<PaqueteAlquilerResponse>(
-      `${this.apiUrl}/${idPaquete}`, 
+      `${this.apiUrl}/${idPaquete}`,
       data
     );
   }
@@ -75,5 +75,9 @@ export class PaqueteAlquilerService {
       `${this.apiUrl}/${idPaquete}/dividir`,
       data
     );
+  }
+
+  casaEnteraDisponible(idPaquete: number): Observable<boolean> {
+    return this.http.get<boolean>(`${this.apiUrl}/${idPaquete}/casa-entera-disponible`);
   }
 }

@@ -104,6 +104,7 @@ export class ClienteDashboardComponent {
 
   protected readonly misReservas = signal<ReservaResponse[]>([]);
   protected readonly loadingMisReservas = signal(false);
+  protected readonly casaEnteraBloqueada = signal(false);
 
   protected readonly ocupacionPaquetes = signal<OcupacionPaqueteResponse[]>([]);
   protected readonly loadingOcupacion = signal(false);
@@ -639,11 +640,28 @@ export class ClienteDashboardComponent {
 
   protected seleccionarPaquete(id: number) {
     this.reservaForm.patchValue({ paqueteId: id });
-  }
+    const paquete = this.paquetes().find(p => p.idPaquete === id);
+    if (paquete) {
+      this.verificarCasaEntera(paquete);
+    }
 
   protected urlFotoSegura(url: string | undefined | null): string | null {
     return resolveFotoSrc(url);
   }
+  protected verificarCasaEntera(paquete: PaqueteAlquilerResponse) {
+      if (paquete?.tipoAlquiler === TipoAlquiler.CASA_COMPLETA_Y_HABITACIONES) {
+        this.paqueteService.casaEnteraDisponible(paquete.idPaquete).subscribe({
+          next: (disponible) => {
+            this.casaEnteraBloqueada.set(!disponible);
+          },
+          error: () => {
+            this.casaEnteraBloqueada.set(false);
+          }
+        });
+      } else {
+        this.casaEnteraBloqueada.set(false);
+      }
+    }
 
   protected fieldState(
     form: 'disp' | 'reserva' | 'pago',
