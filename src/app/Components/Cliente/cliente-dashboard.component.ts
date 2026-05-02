@@ -493,8 +493,8 @@ export class ClienteDashboardComponent {
   }
 
   /**
-   * Construye un detalle mínimo solo con la URL de vista previa guardada en catálogo (mismo navegador).
-   * Sirve mientras no exista GET /casa_rural/{codigo} en el servidor.
+   * Detalle mínimo desde el catálogo local (tarjetas sin pasar por «Cargar / actualizar casa»).
+   * La ficha completa del área cliente viene de GET /casa_rural/cliente/codigo/{id}.
    */
   private casaDesdeCatalogoSoloPreview(c: CasaClienteCatalogo): CasaRuralResponse | null {
     const fotos = (c.fotos?.length ?? 0) > 0
@@ -517,7 +517,7 @@ export class ClienteDashboardComponent {
   }
 
   /**
-   * Galería desde tarjeta: detalle en memoria → GET (cuando exista) → miniatura del catálogo local.
+   * Galería desde tarjeta: detalle activo del mismo código → si no, miniatura del catálogo local.
    */
   protected abrirGaleriaCasa(c: CasaClienteCatalogo) {
     this.msgCasas.set(null);
@@ -535,7 +535,6 @@ export class ClienteDashboardComponent {
 
     const desdeCatalogo = this.casaDesdeCatalogoSoloPreview(c);
 
-    // Backend confirmado: no existe GET /casa_rural/{codigo} actualmente.
     if (desdeCatalogo) {
       this.galeriaCasa.set(desdeCatalogo);
       this.modalGaleriaAbierta.set(true);
@@ -820,10 +819,11 @@ export class ClienteDashboardComponent {
     localStorage.setItem(LS_CODIGO, String(v));
 
     forkJoin({
+      ficha: this.casaRuralService.obtenerCasaClientePorCodigo(v),
       paquetes: this.paqueteService.listarPaquetesPorCasa(v),
       dormitorios: this.dormitorioService.listarDormitorios(v),
     }).subscribe({
-      next: ({ paquetes, dormitorios }) => {
+      next: ({ ficha, paquetes, dormitorios }) => {
         this.paquetes.set(paquetes);
         const first = paquetes[0]?.idPaquete;
         if (first) {
@@ -832,21 +832,19 @@ export class ClienteDashboardComponent {
         this.dormitorios.set(dormitorios);
         this.selectedDormId.set(null);
         this.loadingPaquetes.set(false);
-        const local = this.casasListado().find((x) => x.codigoCasa === v);
-        const casaLocal = local ? this.casaDesdeCatalogoSoloPreview(local) : null;
-        this.casaDetalle.set(casaLocal);
-        const nombre = casaLocal?.poblacion?.trim() ?? `Casa ${v}`;
+        this.casaDetalle.set(ficha);
+        const nombre = ficha.poblacion?.trim() || `Casa ${v}`;
         this.upsertCatalogo({
           codigoCasa: v,
           poblacion: nombre,
-          descripcion: local?.descripcion ?? casaLocal?.descripcion,
-          previewUrl: casaLocal?.fotos?.[0]?.url,
-          fotos: casaLocal?.fotos,
-          numeroDormitorios: local?.numeroDormitorios,
-          numeroBanos: local?.numeroBanos,
-          numeroCocinas: local?.numeroCocinas,
-          numeroComedores: local?.numeroComedores,
-          plazasGaraje: local?.plazasGaraje,
+          descripcion: ficha.descripcion,
+          previewUrl: ficha.fotos?.[0]?.url,
+          fotos: ficha.fotos,
+          numeroDormitorios: ficha.numeroDormitorios,
+          numeroBanos: ficha.numeroBanos,
+          numeroCocinas: ficha.numeroCocinas,
+          numeroComedores: ficha.numeroComedores,
+          plazasGaraje: ficha.plazasGaraje,
         });
         this.cargarOcupacion();
         this.setMsgCasas('ok', `Datos cargados para ${nombre}.`);

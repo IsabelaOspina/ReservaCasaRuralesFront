@@ -38,7 +38,7 @@ export class CasaRuralService {
       .pipe(map((raw) => normalizeCasaRuralResponse(raw)));
   }
 
-  // Obtener una casa rural por su código
+  /** GET /casa_rural/{codigo} — uso genérico si el backend lo expone. */
   obtenerCasaPorCodigo(codigoCasa: number): Observable<CasaRuralResponse> {
     return this.http
       .get<unknown>(`${this.apiUrl}/${codigoCasa}`)
@@ -49,6 +49,16 @@ export class CasaRuralService {
     return this.http.delete<{ mensaje: string }>(
       `${this.apiUrl}/${codigoCasa}`
     );
+  }
+
+  /**
+   * Ficha completa por código numérico — área cliente (JWT rol CLIENTE).
+   * GET /casa_rural/cliente/codigo/{codigoCasa}
+   */
+  obtenerCasaClientePorCodigo(codigoCasa: number): Observable<CasaRuralResponse> {
+    return this.http
+      .get<unknown>(`${this.apiUrl}/cliente/codigo/${codigoCasa}`)
+      .pipe(map((raw) => normalizeCasaRuralResponse(raw)));
   }
 
   /**
