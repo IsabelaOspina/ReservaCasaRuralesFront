@@ -15,6 +15,7 @@ import { ReservaService } from '../../Services/reserva.service';
 import { DormitorioService } from '../../Services/dormitorio.service';
 import { CasaRuralService } from '../../Services/casarural.service';
 import { readApiError } from '../../core/http-error.util';
+import { clearDashboardBrowserCacheOnLogout } from '../../core/browser-app-cache.util';
 import { decodeJwtPayload } from '../../core/auth/jwt.util';
 import { resolveFotoSrc } from '../../core/foto-url.util';
 import { CasaRuralResponse } from '../../DTO/CasaRural-response';
@@ -1087,6 +1088,7 @@ export class ClienteDashboardComponent {
   }
 
   protected logout() {
+    clearDashboardBrowserCacheOnLogout();
     localStorage.removeItem('token');
     void this.router.navigateByUrl('/login');
   }
