@@ -25,6 +25,14 @@ export class PagoService {
   }
 
   /**
+   * Registro de cobro por propietario (mismo cuerpo que {@link registrarPago}).
+   * Requiere JWT con rol PROPIETARIO; mismo contrato de negocio que el alta del cliente.
+   */
+  registrarPagoPropietario(request: PagoRequest): Observable<PagoResponse> {
+    return this.http.post<PagoResponse>(`${this.apiUrl}/registro-propietario`, request);
+  }
+
+  /**
    * Obtener información de pago para una reserva específica
    * @param reservaId - ID de la reserva
    * @returns Observable con la información de pago (total, anticipo, restante, datos bancarios)

@@ -8,7 +8,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { forkJoin } from 'rxjs';
+import { catchError, forkJoin, of } from 'rxjs';
 import {
   AbstractControl,
   FormBuilder,
@@ -24,6 +24,7 @@ import { PaqueteAlquilerService } from '../../Services/paquete.service';
 import { DormitorioService } from '../../Services/dormitorio.service';
 import { CocinaService } from '../../Services/cocina.service';
 import { ReservaService } from '../../Services/reserva.service';
+import { PagoService } from '../../Services/pago.service';
 import { readApiError } from '../../core/http-error.util';
 import { propietarioCasasLocalStorageKey } from '../../core/auth/propietario-storage.util';
 import { CasaRuralRequestDTO } from '../../DTO/CasaRural-request';
@@ -37,6 +38,40 @@ import { TipoCama } from '../../DTO/Dormitorio-request';
 import { DividirPaqueteRequest, SubPaqueteRequest } from '../../DTO/dividir-paquete-request';
 import { ReservaResponse } from '../../DTO/reserva-response';
 import { NotificacionResponse } from '../../DTO/notificacion-response';
+import { MetodoPago, PagoRequest } from '../../DTO/pago-request';
+import { PagoResponse } from '../../DTO/pago-response';
+import {
+  PagoInfoResponse,
+  PagoInfoResponseAmigable,
+  transformPagoInfoResponse,
+} from '../../DTO/pagoinfo-response';
+
+function hoyLocalISODate(): string {
+  const h = new Date();
+  const y = h.getFullYear();
+  const m = String(h.getMonth() + 1).padStart(2, '0');
+  const d = String(h.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function fechaPagoNoPasada(control: AbstractControl): { fechaPagoPasada: true } | null {
+  const v = control.value;
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v !== 'string') return { fechaPagoPasada: true };
+  const s = v.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return { fechaPagoPasada: true };
+  if (s < hoyLocalISODate()) return { fechaPagoPasada: true };
+  return null;
+}
+
+/** Vacío = válido; si hay fecha, no puede ser anterior a hoy. */
+function fechaPagoOpcionalNoPasada(): ValidatorFn {
+  return (control: AbstractControl): ValidationErrors | null => {
+    const v = control.value;
+    if (v === null || v === undefined || String(v).trim() === '') return null;
+    return fechaPagoNoPasada(control);
+  };
+}
 
 function rangoFechasPaquete(): ValidatorFn {
   return (group: AbstractControl): ValidationErrors | null => {
@@ -78,9 +113,12 @@ export class PropietarioDashboardComponent {
   private readonly dormitorioService = inject(DormitorioService);
   private readonly cocinaService = inject(CocinaService);
   private readonly reservaService = inject(ReservaService);
+  private readonly pagoService = inject(PagoService);
   private readonly router = inject(Router);
 
-  protected readonly tab = signal<'casa' | 'paquetes' | 'dormitorios' | 'cocinas' | 'reservas'>('casa');
+  protected readonly tab = signal<
+    'casa' | 'paquetes' | 'dormitorios' | 'cocinas' | 'reservas' | 'cobros'
+  >('casa');
 
   protected readonly casasLocales = signal<CasaRegistradaLocal[]>([]);
   protected readonly codigoActivo = signal<number | null>(null);
@@ -154,6 +192,29 @@ export class PropietarioDashboardComponent {
     tieneLavavajillas: [false],
     tieneLavadora: [false],
   });
+
+  protected readonly loadingPagosProp = signal(false);
+  protected readonly propPagoInfo = signal(
+    null as ReturnType<typeof transformPagoInfoResponse> | null
+  );
+  protected readonly propPagosLista = signal<PagoResponse[]>([]);
+  protected readonly propPagoMensaje = signal<{
+    tipo: 'error' | 'success';
+    texto: string;
+  } | null>(null);
+
+  protected readonly propPagoForm = this.fb.group({
+    reservaId: [null as number | null, [Validators.required, Validators.min(1)]],
+    monto: [0, [Validators.required, Validators.min(0.01)]],
+    metodoPago: [MetodoPago.TRANSFERENCIA as MetodoPago, Validators.required],
+    fechaPago: ['', [fechaPagoOpcionalNoPasada()]],
+  });
+
+  protected readonly metodosPagoProp = [
+    MetodoPago.TRANSFERENCIA,
+    MetodoPago.TARJETA,
+    MetodoPago.EFECTIVO,
+  ];
 
   protected tituloCasaActiva(): string {
     const id = this.codigoActivo();
@@ -313,6 +374,7 @@ export class PropietarioDashboardComponent {
       this.codigoActivo.set(last);
       this.refrescarListas(last);
     }
+    this.propPagoForm.patchValue({ fechaPago: hoyLocalISODate() });
   }
 
   private lsCasasKey(): string {
@@ -350,7 +412,9 @@ export class PropietarioDashboardComponent {
     };
   }
 
-  protected setTab(t: 'casa' | 'paquetes' | 'dormitorios' | 'cocinas' | 'reservas') {
+  protected setTab(
+    t: 'casa' | 'paquetes' | 'dormitorios' | 'cocinas' | 'reservas' | 'cobros'
+  ) {
     this.clearMessages();
     this.tab.set(t);
     if (t === 'reservas') this.cargarReservas();
@@ -815,5 +879,227 @@ export class PropietarioDashboardComponent {
   protected clearMessages() {
     this.error.set(null);
     this.success.set(null);
+    this.propPagoMensaje.set(null);
+  }
+
+  private parseReservaIdPropPago(): number | null {
+    const v = this.propPagoForm.getRawValue().reservaId;
+    const n = typeof v === 'number' ? v : Number(v);
+    if (!Number.isFinite(n) || n < 1) return null;
+    return n;
+  }
+
+  private fetchPagoInfoYPagosProp(reservaId: number) {
+    return forkJoin({
+      raw: this.pagoService.obtenerInfoPago(reservaId),
+      pagos: this.pagoService
+        .obtenerPagosPorReserva(reservaId)
+        .pipe(catchError(() => of([] as PagoResponse[]))),
+    });
+  }
+
+  private aplicarRespuestaPropPago(
+    _reservaId: number,
+    raw: PagoInfoResponse,
+    pagos: PagoResponse[]
+  ): void {
+    void _reservaId;
+    this.propPagoInfo.set(transformPagoInfoResponse(raw));
+    this.propPagosLista.set(this.normalizarListaPagosProp(pagos));
+  }
+
+  private normalizarListaPagosProp(list: PagoResponse[]): PagoResponse[] {
+    const map = new Map<number, PagoResponse>();
+    for (const p of list ?? []) {
+      if (!p) continue;
+      const ext = p as unknown as { id?: number };
+      const id = Number(p.idPago ?? ext.id);
+      if (!Number.isFinite(id)) continue;
+      map.set(id, { ...p, idPago: id });
+    }
+    return [...map.values()].sort((a, b) => a.idPago - b.idPago);
+  }
+
+  protected totalPagadoProp(): number {
+    return this.propPagosLista().reduce((s, p) => {
+      const m = Number(p.monto);
+      return s + (Number.isFinite(m) ? m : 0);
+    }, 0);
+  }
+
+  protected saldoRestanteProp(info: PagoInfoResponseAmigable): number {
+    const t = Number(info.totalAPagar);
+    const total = Number.isFinite(t) && t > 0 ? t : 0;
+    const pagado = this.totalPagadoProp();
+    return Math.round(Math.max(0, total - pagado) * 100) / 100;
+  }
+
+  private setPropPagoFeedback(tipo: 'error' | 'success', texto: string): void {
+    this.propPagoMensaje.set({ tipo, texto });
+  }
+
+  protected cargarInfoPagoProp(opts?: { preserveBanner?: boolean }): void {
+    if (!opts?.preserveBanner) this.propPagoMensaje.set(null);
+    const id = this.parseReservaIdPropPago();
+    if (id == null) {
+      this.setPropPagoFeedback('error', 'Indica un ID de reserva válido.');
+      return;
+    }
+    this.loadingPagosProp.set(true);
+    this.fetchPagoInfoYPagosProp(id).subscribe({
+      next: ({ raw, pagos }) => {
+        this.loadingPagosProp.set(false);
+        this.aplicarRespuestaPropPago(id, raw, pagos);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.loadingPagosProp.set(false);
+        this.propPagoInfo.set(null);
+        this.propPagosLista.set([]);
+        this.setPropPagoFeedback('error', readApiError(err));
+      },
+    });
+  }
+
+  protected listarPagosReservaProp(opts?: { preserveBanner?: boolean }): void {
+    if (!opts?.preserveBanner) this.propPagoMensaje.set(null);
+    const id = this.parseReservaIdPropPago();
+    if (id == null) {
+      this.setPropPagoFeedback('error', 'Indica un ID de reserva válido.');
+      return;
+    }
+    this.loadingPagosProp.set(true);
+    this.fetchPagoInfoYPagosProp(id).subscribe({
+      next: ({ raw, pagos }) => {
+        this.loadingPagosProp.set(false);
+        this.aplicarRespuestaPropPago(id, raw, pagos);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.loadingPagosProp.set(false);
+        this.propPagoInfo.set(null);
+        this.propPagosLista.set([]);
+        this.setPropPagoFeedback('error', readApiError(err));
+      },
+    });
+  }
+
+  protected fieldStatePropPago(
+    name: 'reservaId' | 'monto' | 'metodoPago' | 'fechaPago'
+  ): '' | 'invalid' | 'valid' {
+    const c = this.propPagoForm.get(name);
+    if (!c) return '';
+    if (!(c.dirty || c.touched)) return '';
+    return c.invalid ? 'invalid' : 'valid';
+  }
+
+  protected etiquetaMetodoPagoProp(m: MetodoPago): string {
+    const map: Record<MetodoPago, string> = {
+      [MetodoPago.TRANSFERENCIA]: 'Transferencia',
+      [MetodoPago.TARJETA]: 'Tarjeta',
+      [MetodoPago.EFECTIVO]: 'Efectivo',
+    };
+    return map[m] ?? String(m);
+  }
+
+  protected fechaMinimaPagoProp(): string {
+    return hoyLocalISODate();
+  }
+
+  protected canRegistrarPagoProp(): boolean {
+    if (this.loadingPagosProp()) return false;
+    if (this.propPagoForm.get('reservaId')?.invalid) return false;
+    if (this.propPagoForm.get('monto')?.invalid) return false;
+    if (this.propPagoForm.get('metodoPago')?.invalid) return false;
+    if (this.propPagoForm.get('fechaPago')?.invalid) return false;
+    return true;
+  }
+
+  protected registrarPagoPropietario(): void {
+    this.propPagoMensaje.set(null);
+    this.propPagoForm.markAllAsTouched();
+    if (this.propPagoForm.invalid) {
+      if (this.propPagoForm.get('fechaPago')?.hasError('fechaPagoPasada')) {
+        this.setPropPagoFeedback('error', 'La fecha de pago no puede ser anterior a hoy.');
+      }
+      return;
+    }
+    const p = this.propPagoForm.getRawValue();
+    const reservaId = this.parseReservaIdPropPago();
+    const monto = p.monto;
+    const metodoPago = p.metodoPago;
+    if (reservaId == null || monto == null || metodoPago == null) {
+      this.propPagoForm.markAllAsTouched();
+      return;
+    }
+    const montoNum = Number(monto);
+    if (!Number.isFinite(montoNum) || montoNum < 0.01) {
+      this.propPagoForm.markAllAsTouched();
+      return;
+    }
+    const montoJson = Math.round(montoNum * 100) / 100;
+
+    this.loadingPagosProp.set(true);
+    this.fetchPagoInfoYPagosProp(reservaId).subscribe({
+      next: ({ raw, pagos }) => {
+        this.aplicarRespuestaPropPago(reservaId, raw, pagos);
+        const info = this.propPagoInfo();
+        if (!info) {
+          this.loadingPagosProp.set(false);
+          this.setPropPagoFeedback('error', 'No se pudieron cargar los importes de esta reserva.');
+          return;
+        }
+        const pendiente = this.saldoRestanteProp(info);
+        if (montoJson > pendiente + 0.005) {
+          this.loadingPagosProp.set(false);
+          this.setPropPagoFeedback(
+            'error',
+            `El importe supera el saldo pendiente (${pendiente.toFixed(2)} €).`
+          );
+          return;
+        }
+
+        const body: PagoRequest = {
+          reservaId,
+          monto: montoJson,
+          metodoPago,
+          confirmado: true,
+        };
+        const fp = String(p.fechaPago ?? '').trim();
+        if (fp) body.fechaPago = fp;
+
+        this.pagoService.registrarPagoPropietario(body).subscribe({
+          next: () => {
+            this.loadingPagosProp.set(false);
+            this.setPropPagoFeedback('success', 'Cobro registrado correctamente.');
+            const rid = reservaId;
+            const hoy = hoyLocalISODate();
+            this.fetchPagoInfoYPagosProp(rid).subscribe({
+              next: ({ raw: r2, pagos: p2 }) => {
+                this.aplicarRespuestaPropPago(rid, r2, p2);
+              },
+              error: () => {
+                this.propPagoInfo.set(null);
+                this.propPagosLista.set([]);
+              },
+            });
+            this.propPagoForm.patchValue({
+              reservaId: rid,
+              monto: 0,
+              metodoPago: MetodoPago.TRANSFERENCIA,
+              fechaPago: hoy,
+            });
+            this.propPagoForm.markAsPristine();
+            this.propPagoForm.markAsUntouched();
+          },
+          error: (err: HttpErrorResponse) => {
+            this.loadingPagosProp.set(false);
+            this.setPropPagoFeedback('error', readApiError(err));
+          },
+        });
+      },
+      error: (err: HttpErrorResponse) => {
+        this.loadingPagosProp.set(false);
+        this.setPropPagoFeedback('error', readApiError(err));
+      },
+    });
   }
 }
