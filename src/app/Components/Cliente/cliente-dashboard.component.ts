@@ -616,7 +616,8 @@ export class ClienteDashboardComponent {
     const id = this.reservaForm.getRawValue().paqueteId;
     if (!id) return false;
     const p = this.paquetes().find((x) => x.idPaquete === id);
-    return p?.tipoAlquiler === TipoAlquiler.POR_HABITACIONES;
+    return p?.tipoAlquiler === TipoAlquiler.POR_HABITACIONES ||
+      p?.tipoAlquiler === TipoAlquiler.CASA_COMPLETA_Y_HABITACIONES;
   }
 
   private paqueteSeleccionado(): PaqueteAlquilerResponse | null {
@@ -710,7 +711,7 @@ export class ClienteDashboardComponent {
   protected urlFotoSegura(url: string | undefined | null): string | null {
     return resolveFotoSrc(url);
   }
-  
+
   protected verificarCasaEntera(paquete: PaqueteAlquilerResponse) {
       if (paquete?.tipoAlquiler === TipoAlquiler.CASA_COMPLETA_Y_HABITACIONES) {
         this.paqueteService.casaEnteraDisponible(paquete.idPaquete).subscribe({
@@ -746,8 +747,12 @@ export class ClienteDashboardComponent {
     const tel = this.reservaForm.get('telefonoContacto');
     if (!tel?.valid) return false;
     if (this.mostrarSeleccionDormitoriosReserva() && this.selectedDormId() == null) {
-      return false;
+      const p = this.paqueteSeleccionado();
+      if (p?.tipoAlquiler === TipoAlquiler.POR_HABITACIONES) {
+        return false;
+      }
     }
+    if (this.casaEnteraBloqueada()) return false;
     return this.reservaForm.valid;
   }
 
@@ -936,8 +941,11 @@ export class ClienteDashboardComponent {
       return;
     }
     if (this.mostrarSeleccionDormitoriosReserva() && this.selectedDormId() == null) {
-      this.setMsgReserva('err', 'Selecciona una habitación para el paquete por habitaciones.');
-      return;
+      const p = this.paqueteSeleccionado();
+      if (p?.tipoAlquiler === TipoAlquiler.POR_HABITACIONES) {
+        this.setMsgReserva('err', 'Selecciona una habitación para el paquete por habitaciones.');
+        return;
+      }
     }
     this.loadingReserva.set(true);
     const r = this.reservaForm.getRawValue();
