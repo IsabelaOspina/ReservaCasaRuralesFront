@@ -26,6 +26,7 @@ import { CocinaService } from '../../Services/cocina.service';
 import { ReservaService } from '../../Services/reserva.service';
 import { PagoService } from '../../Services/pago.service';
 import { readApiError } from '../../core/http-error.util';
+import { clearDashboardBrowserCacheOnLogout } from '../../core/browser-app-cache.util';
 import { propietarioCasasLocalStorageKey } from '../../core/auth/propietario-storage.util';
 import { CasaRuralRequestDTO } from '../../DTO/CasaRural-request';
 import { CasaRuralResponse } from '../../DTO/CasaRural-response';
@@ -870,6 +871,7 @@ export class PropietarioDashboardComponent {
   }
 
   protected logout() {
+    clearDashboardBrowserCacheOnLogout();
     localStorage.removeItem('token');
     void this.router.navigateByUrl('/login');
   }
