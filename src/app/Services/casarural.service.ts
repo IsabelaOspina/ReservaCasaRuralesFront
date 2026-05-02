@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
@@ -38,7 +38,7 @@ export class CasaRuralService {
       .pipe(map((raw) => normalizeCasaRuralResponse(raw)));
   }
 
-  // Obtener una casa rural por su código
+  /** GET /casa_rural/{codigo} — uso genérico si el backend lo expone. */
   obtenerCasaPorCodigo(codigoCasa: number): Observable<CasaRuralResponse> {
     return this.http
       .get<unknown>(`${this.apiUrl}/${codigoCasa}`)
@@ -49,6 +49,16 @@ export class CasaRuralService {
     return this.http.delete<{ mensaje: string }>(
       `${this.apiUrl}/${codigoCasa}`
     );
+  }
+
+  /**
+   * Ficha completa por código numérico — área cliente (JWT rol CLIENTE).
+   * GET /casa_rural/cliente/codigo/{codigoCasa}
+   */
+  obtenerCasaClientePorCodigo(codigoCasa: number): Observable<CasaRuralResponse> {
+    return this.http
+      .get<unknown>(`${this.apiUrl}/cliente/codigo/${codigoCasa}`)
+      .pipe(map((raw) => normalizeCasaRuralResponse(raw)));
   }
 
   /**
@@ -65,6 +75,18 @@ export class CasaRuralService {
   /** Alias por compatibilidad con implementaciones anteriores. */
   listarCasas(): Observable<CasaRuralResponse[]> {
     return this.listarCasasDisponibles();
+  }
+
+  /**
+   * Búsqueda por población (subcadena, sin distinguir mayúsculas en el servidor).
+   * GET /casa_rural/buscar?poblacion=… — rol CLIENTE.
+   */
+  buscarPorPoblacion(poblacion: string): Observable<CasaRuralResponse[]> {
+    const q = poblacion.trim();
+    const params = new HttpParams().set('poblacion', q);
+    return this.http
+      .get<unknown>(`${this.apiUrl}/buscar`, { params })
+      .pipe(map((raw) => this.parseListadoCasas(raw)));
   }
 
   private parseListadoCasas(raw: unknown): CasaRuralResponse[] {

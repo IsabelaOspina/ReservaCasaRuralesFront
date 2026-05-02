@@ -94,7 +94,40 @@
           </p>
         }
 
-        @if (loadingListadoCasas()) {
+        <form
+          class="cli__add-code cli__buscar-poblacion"
+          [formGroup]="buscarPoblacionForm"
+          (ngSubmit)="buscarCasasPorPoblacion()"
+        >
+          <label class="cli__field cli__field--grow">
+            <span class="cli__label">Buscar por población</span>
+            <input
+              type="text"
+              formControlName="poblacion"
+              placeholder="Ej. Valldemossa"
+              autocomplete="address-level2"
+            />
+          </label>
+          <button
+            type="submit"
+            class="cli__btn cli__btn--secondary"
+            [disabled]="loadingBusquedaPoblacion() || loadingListadoCasas()"
+          >
+            {{ loadingBusquedaPoblacion() ? 'Buscando…' : 'Buscar' }}
+          </button>
+          @if (modoListadoCasas() === 'busqueda') {
+            <button
+              type="button"
+              class="cli__btn cli__btn--ghost"
+              (click)="verListadoGeneralCasas()"
+              [disabled]="loadingListadoCasas() || loadingBusquedaPoblacion()"
+            >
+              Ver todas las casas
+            </button>
+          }
+        </form>
+
+        @if (loadingListadoCasas() || loadingBusquedaPoblacion()) {
           <p class="cli__muted cli__loading-inline">Cargando casas…</p>
         }
 
@@ -148,6 +181,8 @@
                 <span class="cli__house-ribbon">Casa activa</span>
               }
             </article>
+          } @empty {
+            <p class="cli__muted cli__house-strip-empty">No hay casas en este listado.</p>
           }
         </div>
 

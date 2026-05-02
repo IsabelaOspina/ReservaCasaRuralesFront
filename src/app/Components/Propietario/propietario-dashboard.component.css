@@ -379,6 +379,132 @@
   color: var(--text-500);
 }
 
+.form-hint {
+  font-size: 0.78rem;
+  color: var(--text-500, #6b7280);
+  margin-top: 0.15rem;
+}
+
+/* ——— Cobros reservas (propietario) ——— */
+.prop-pago-feedback {
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+.prop-pago-feedback--ok {
+  background: rgba(107, 142, 35, 0.12);
+  border: 1px solid rgba(107, 142, 35, 0.35);
+  color: var(--rural-green-dark);
+}
+
+.prop-pago-feedback--err {
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.28);
+  color: #991b1b;
+}
+
+.prop-pago-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
+.prop-pago-summary {
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(160, 82, 45, 0.18);
+}
+
+.prop-pago-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+  gap: 0.65rem 1rem;
+  margin: 0.5rem 0 0.75rem;
+}
+
+.prop-pago-stat__label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-500);
+}
+
+.prop-pago-stat__value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-800);
+}
+
+.prop-pago-stat__value--accent {
+  color: var(--rural-earth);
+}
+
+.prop-pago-bank {
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.prop-pago-bank__head {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+  color: var(--rural-green-dark);
+}
+
+.prop-pago-bank__k {
+  font-weight: 600;
+  color: var(--text-600);
+  margin-right: 0.35rem;
+}
+
+.prop-pago-list {
+  margin-top: 0.5rem;
+}
+
+.prop-pago-cards {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.prop-pago-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  background: rgba(245, 245, 220, 0.5);
+  border: 1px solid rgba(160, 82, 45, 0.15);
+}
+
+.prop-pago-card__id {
+  font-weight: 700;
+  color: var(--rural-green-dark);
+}
+
+.prop-pago-card__amount {
+  font-weight: 700;
+}
+
+.prop-pago-chip {
+  font-size: 0.78rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(31, 41, 55, 0.12);
+}
+
 .card__footnote {
   margin: 1rem 0 0;
   font-size: 0.82rem;
