@@ -452,9 +452,10 @@
                 </div>
                 <div class="cli__mis-reserva-card__meta">
                   <span class="cli__pago-chip">Casa #{{ r.casaId }}</span>
+                  <span class="cli__pago-chip">Paquete #{{ r.paqueteId }}</span>
                   <span class="cli__pago-chip cli__pago-chip--date">Creada: {{ r.fechaCreacion }}</span>
                   @if (r.estado === 'PENDIENTE') {
-                    <span class="cli__pago-chip cli__pago-chip--date">L&iacute;mite pago: {{ r.fechaLimitePago }}</span>
+                    <span class="cli__pago-chip cli__pago-chip--date">Límite pago: {{ r.fechaLimitePago }}</span>
                   }
                 </div>
               </li>
