@@ -644,10 +644,12 @@ export class ClienteDashboardComponent {
     if (paquete) {
       this.verificarCasaEntera(paquete);
     }
+  }
 
   protected urlFotoSegura(url: string | undefined | null): string | null {
     return resolveFotoSrc(url);
   }
+  
   protected verificarCasaEntera(paquete: PaqueteAlquilerResponse) {
       if (paquete?.tipoAlquiler === TipoAlquiler.CASA_COMPLETA_Y_HABITACIONES) {
         this.paqueteService.casaEnteraDisponible(paquete.idPaquete).subscribe({
