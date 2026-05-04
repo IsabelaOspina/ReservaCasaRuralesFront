@@ -48,6 +48,12 @@ export class CasaRuralService {
       .pipe(map((raw) => normalizeCasaRuralResponse(raw)));
   }
 
+  eliminarCasa(codigoCasa: number): Observable<{ mensaje: string }> {
+    return this.http.delete<{ mensaje: string }>(
+      `${this.apiUrl}/${codigoCasa}`
+    );
+  }
+
   /**
    * Listado con JWT de propietario (o cliente): mismo endpoint que el listado general.
    * `GET /casa_rural/listar` — el backend admite CLIENTE y PROPIETARIO; hoy devuelve todas las casas

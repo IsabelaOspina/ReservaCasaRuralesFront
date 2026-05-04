@@ -6,4 +6,5 @@ export interface PagoResponse {
   metodoPago: MetodoPago;
   fechaPago: string;
   confirmado: boolean;
+  estadoReserva: string;
 }

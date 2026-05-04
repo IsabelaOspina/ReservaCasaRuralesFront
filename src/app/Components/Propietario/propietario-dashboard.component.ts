@@ -23,6 +23,7 @@ import { CasaRuralService } from '../../Services/casarural.service';
 import { PaqueteAlquilerService } from '../../Services/paquete.service';
 import { DormitorioService } from '../../Services/dormitorio.service';
 import { CocinaService } from '../../Services/cocina.service';
+import { ReservaService } from '../../Services/reserva.service';
 import { PagoService } from '../../Services/pago.service';
 import { readApiError } from '../../core/http-error.util';
 import { clearPropietarioCasasLocalCache } from '../../core/dashboard-browser-cache.util';
@@ -36,6 +37,9 @@ import { TipoAlquiler } from '../../DTO/paquete-request';
 import { DormitorioResponse } from '../../DTO/Dormitorio-response';
 import { CocinaResponse } from '../../DTO/Cocina-response';
 import { TipoCama } from '../../DTO/Dormitorio-request';
+import { DividirPaqueteRequest, SubPaqueteRequest } from '../../DTO/dividir-paquete-request';
+import { ReservaResponse } from '../../DTO/reserva-response';
+import { NotificacionResponse } from '../../DTO/notificacion-response';
 import { MetodoPago } from '../../DTO/pago-request';
 import { PagoResponse } from '../../DTO/pago-response';
 import {
@@ -58,15 +62,11 @@ export interface CasaRegistradaLocal {
   codigoCasa: number;
   poblacion: string;
   descripcion?: string;
-  /** Tope de registros POST dormitorio; se guarda tras alta o detalle GET. */
   numeroDormitorios?: number;
-  /** Tope de registros POST cocina. */
   numeroCocinas?: number;
-  /** Tope de baños en ficha (dormitorios con baño no pueden superarlo). */
   numeroBanos?: number;
   numeroComedores?: number;
   plazasGaraje?: number;
-  /** Miniatura/galería local (mientras no exista GET por código en backend). */
   previewUrl?: string;
   fotos?: FotoResponse[];
 }
@@ -87,11 +87,12 @@ export class PropietarioDashboardComponent {
   private readonly paqueteService = inject(PaqueteAlquilerService);
   private readonly dormitorioService = inject(DormitorioService);
   private readonly cocinaService = inject(CocinaService);
+  private readonly reservaService = inject(ReservaService);
   private readonly pagoService = inject(PagoService);
   private readonly router = inject(Router);
 
   protected readonly tab = signal<
-    'casa' | 'paquetes' | 'dormitorios' | 'cocinas' | 'cobros'
+    'casa' | 'paquetes' | 'dormitorios' | 'cocinas' | 'reservas' | 'cobros'
   >('casa');
 
   protected readonly casasLocales = signal<CasaRegistradaLocal[]>([]);
@@ -105,28 +106,32 @@ export class PropietarioDashboardComponent {
   protected readonly paquetes = signal<PaqueteAlquilerResponse[]>([]);
   protected readonly dormitorios = signal<DormitorioResponse[]>([]);
   protected readonly cocinas = signal<CocinaResponse[]>([]);
-  /** Detalle de la casa activa (cupos); null hasta cargar API o reconstruir desde local. */
   protected readonly casaActivaDetalle = signal<CasaRuralResponse | null>(null);
+
+  // ——— Reservas ———
+  protected readonly reservasPendientes = signal<ReservaResponse[]>([]);
+  protected readonly notificaciones = signal<NotificacionResponse[]>([]);
+
+  protected readonly paqueteDividirId = signal<number | null>(null);
+  protected readonly dividirSubPaquetes = signal<SubPaqueteRequest[]>([]);
+  protected readonly loadingDividir = signal(false);
 
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly success = signal<string | null>(null);
+  /** Modal de confirmación para eliminar casa */
+  protected readonly modalEliminarAbierta = signal(false);
 
-  /** Valores iniciales vacíos; tras registrar una casa se resetea a vacío (no a «3,2,1…» que parecían datos viejos). */
   protected readonly casaForm = this.fb.group({
     poblacion: ['', Validators.required],
     descripcion: ['', Validators.required],
-    numeroDormitorios: [
-      null as number | null,
-      [Validators.required, Validators.min(3)],
-    ],
+    numeroDormitorios: [null as number | null, [Validators.required, Validators.min(3)]],
     numeroBanos: [null as number | null, [Validators.required, Validators.min(2)]],
     numeroCocinas: [null as number | null, [Validators.required, Validators.min(1)]],
     numeroComedores: [null as number | null, [Validators.required, Validators.min(0)]],
     plazasGaraje: [null as number | null, [Validators.required, Validators.min(0)]],
   });
 
-  /** Una fila por foto: archivo (en `fotoFiles`) + descripción. El API usa multipart con File[]. */
   protected readonly fotosRows = this.fb.nonNullable.array([
     this.fb.nonNullable.group({
       descripcion: ['', Validators.required],
@@ -191,23 +196,17 @@ export class PropietarioDashboardComponent {
     return nom ? `Casa Rural ${nom}` : `Casa código ${id}`;
   }
 
-  /** Máximo de dormitorios registrables (alta de casa); null si aún no hay dato. */
   protected maxDormitoriosPermitidos(): number | null {
     const d = this.casaActivaDetalle();
     if (d != null && Number.isFinite(d.numeroDormitorios)) return d.numeroDormitorios;
-    const loc = this.casasLocales().find(
-      (x) => x.codigoCasa === this.codigoActivo()
-    );
+    const loc = this.casasLocales().find((x) => x.codigoCasa === this.codigoActivo());
     return loc?.numeroDormitorios ?? null;
   }
 
-  /** Máximo de cocinas registrables. */
   protected maxCocinasPermitidas(): number | null {
     const d = this.casaActivaDetalle();
     if (d != null && Number.isFinite(d.numeroCocinas)) return d.numeroCocinas;
-    const loc = this.casasLocales().find(
-      (x) => x.codigoCasa === this.codigoActivo()
-    );
+    const loc = this.casasLocales().find((x) => x.codigoCasa === this.codigoActivo());
     return loc?.numeroCocinas ?? null;
   }
 
@@ -223,30 +222,18 @@ export class PropietarioDashboardComponent {
     return this.cocinas().length >= max;
   }
 
-  /** Baños ya asignados en dormitorios con «tiene baño». */
   protected banosAsignadosEnDormitorios(): number {
     return this.dormitorios().filter((d) => d.tieneBano).length;
   }
 
   protected maxBanosPermitidos(): number | null {
     const d = this.casaActivaDetalle();
-    if (d != null && Number.isFinite(d.numeroBanos) && d.numeroBanos > 0) {
-      return d.numeroBanos;
-    }
-    const loc = this.casasLocales().find(
-      (x) => x.codigoCasa === this.codigoActivo()
-    );
-    if (
-      loc?.numeroBanos != null &&
-      Number.isFinite(loc.numeroBanos) &&
-      loc.numeroBanos > 0
-    ) {
-      return loc.numeroBanos;
-    }
+    if (d != null && Number.isFinite(d.numeroBanos) && d.numeroBanos > 0) return d.numeroBanos;
+    const loc = this.casasLocales().find((x) => x.codigoCasa === this.codigoActivo());
+    if (loc?.numeroBanos != null && Number.isFinite(loc.numeroBanos) && loc.numeroBanos > 0) return loc.numeroBanos;
     return null;
   }
 
-  /** Tope de baños alcanzado (según ficha de la casa). */
   protected cupoBanosLleno(): boolean {
     const max = this.maxBanosPermitidos();
     if (max == null) return false;
@@ -271,14 +258,7 @@ export class PropietarioDashboardComponent {
   }
 
   protected fieldStateCasa(
-    name:
-      | 'poblacion'
-      | 'descripcion'
-      | 'numeroDormitorios'
-      | 'numeroBanos'
-      | 'numeroCocinas'
-      | 'numeroComedores'
-      | 'plazasGaraje'
+    name: 'poblacion' | 'descripcion' | 'numeroDormitorios' | 'numeroBanos' | 'numeroCocinas' | 'numeroComedores' | 'plazasGaraje'
   ): '' | 'invalid' | 'valid' {
     const c = this.casaForm.get(name);
     if (!c) return '';
@@ -298,17 +278,14 @@ export class PropietarioDashboardComponent {
     name: 'fechaInicio' | 'fechaFin' | 'precio' | 'tipoAlquiler',
     form: 'nuevo' | 'edit' = 'nuevo'
   ): '' | 'invalid' | 'valid' {
-    const fg: FormGroup =
-      form === 'nuevo' ? this.paqueteForm : this.paqueteEditForm;
+    const fg: FormGroup = form === 'nuevo' ? this.paqueteForm : this.paqueteEditForm;
     const c = fg.get(name);
     if (!c) return '';
     if (!(c.dirty || c.touched)) return '';
     return c.invalid ? 'invalid' : 'valid';
   }
 
-  protected fieldStateDorm(
-    name: 'nombre' | 'numeroCamas' | 'tipoCama'
-  ): '' | 'invalid' | 'valid' {
+  protected fieldStateDorm(name: 'nombre' | 'numeroCamas' | 'tipoCama'): '' | 'invalid' | 'valid' {
     const c = this.dormForm.get(name);
     if (!c) return '';
     if (!(c.dirty || c.touched)) return '';
@@ -316,8 +293,7 @@ export class PropietarioDashboardComponent {
   }
 
   protected paqueteFechasInvalidas(form: 'nuevo' | 'edit'): boolean {
-    const fg: FormGroup =
-      form === 'nuevo' ? this.paqueteForm : this.paqueteEditForm;
+    const fg: FormGroup = form === 'nuevo' ? this.paqueteForm : this.paqueteEditForm;
     if (!fg.hasError('fechas')) return false;
     const ini = fg.get('fechaInicio');
     const fin = fg.get('fechaFin');
@@ -332,30 +308,15 @@ export class PropietarioDashboardComponent {
   }
 
   protected canCrearPaquete(): boolean {
-    return (
-      this.paqueteForm.valid &&
-      !this.paqueteForm.hasError('fechas') &&
-      this.codigoActivo() != null &&
-      !this.loading()
-    );
+    return this.paqueteForm.valid && !this.paqueteForm.hasError('fechas') && this.codigoActivo() != null && !this.loading();
   }
 
   protected canActualizarPaquete(): boolean {
-    return (
-      this.paqueteEditForm.valid &&
-      !this.paqueteEditForm.hasError('fechas') &&
-      !this.loading()
-    );
+    return this.paqueteEditForm.valid && !this.paqueteEditForm.hasError('fechas') && !this.loading();
   }
 
   protected canRegistrarDormitorio(): boolean {
-    if (
-      !this.dormForm.valid ||
-      this.codigoActivo() == null ||
-      this.loading()
-    ) {
-      return false;
-    }
+    if (!this.dormForm.valid || this.codigoActivo() == null || this.loading()) return false;
     if (this.cupoDormitoriosLleno()) return false;
     return true;
   }
@@ -366,12 +327,13 @@ export class PropietarioDashboardComponent {
     return true;
   }
 
+
   protected readonly tiposAlquiler = [
     TipoAlquiler.CASA_COMPLETA,
     TipoAlquiler.POR_HABITACIONES,
     TipoAlquiler.CASA_COMPLETA_Y_HABITACIONES,
   ];
-  /** Etiquetas UX; el API solo acepta valores del enum del backend. */
+
   protected readonly opcionesCama: { value: TipoCama; label: string }[] = [
     { value: TipoCama.DOBLE, label: 'Doble' },
     { value: TipoCama.SENCILLA, label: 'Individual (sencilla)' },
@@ -504,14 +466,7 @@ export class PropietarioDashboardComponent {
   private construirCasaDetalleDesdeLocal(codigo: number): CasaRuralResponse | null {
     const c = this.casasLocales().find((x) => x.codigoCasa === codigo);
     if (!c) return null;
-    if (
-      c.numeroDormitorios == null ||
-      c.numeroCocinas == null ||
-      !Number.isFinite(c.numeroDormitorios) ||
-      !Number.isFinite(c.numeroCocinas)
-    ) {
-      return null;
-    }
+    if (c.numeroDormitorios == null || c.numeroCocinas == null || !Number.isFinite(c.numeroDormitorios) || !Number.isFinite(c.numeroCocinas)) return null;
     return {
       codigoCasa: c.codigoCasa,
       poblacion: c.poblacion,
@@ -526,18 +481,15 @@ export class PropietarioDashboardComponent {
   }
 
   protected setTab(
-    t: 'casa' | 'paquetes' | 'dormitorios' | 'cocinas' | 'cobros'
+    t: 'casa' | 'paquetes' | 'dormitorios' | 'cocinas' | 'reservas' | 'cobros'
   ) {
     this.clearMessages();
     this.tab.set(t);
+    if (t === 'reservas') this.cargarReservas();
   }
 
   protected addFotoRow() {
-    this.fotosRows.push(
-      this.fb.nonNullable.group({
-        descripcion: ['', Validators.required],
-      })
-    );
+    this.fotosRows.push(this.fb.nonNullable.group({ descripcion: ['', Validators.required] }));
     this.fotoFiles.push(null);
   }
 
@@ -557,7 +509,6 @@ export class PropietarioDashboardComponent {
     return f ? f.name : 'Ningún archivo seleccionado';
   }
 
-  /** Deja el formulario listo para registrar otra casa (evita confundir con datos ya guardados). */
   private resetFormularioAltaCasa(): void {
     this.casaForm.reset({
       poblacion: '',
@@ -573,11 +524,7 @@ export class PropietarioDashboardComponent {
       this.fotoFiles.pop();
     }
     if (this.fotosRows.length === 0) {
-      this.fotosRows.push(
-        this.fb.nonNullable.group({
-          descripcion: ['', Validators.required],
-        })
-      );
+      this.fotosRows.push(this.fb.nonNullable.group({ descripcion: ['', Validators.required] }));
       this.fotoFiles = [null];
     } else {
       this.fotosRows.at(0)?.patchValue({ descripcion: '' });
@@ -587,11 +534,8 @@ export class PropietarioDashboardComponent {
     this.casaForm.markAsUntouched();
     this.fotosRows.markAsPristine();
     this.fotosRows.markAsUntouched();
-    // Los <input type="file"> no están ligados al FormControl; hay que vaciar el DOM.
     setTimeout(() => {
-      this.fotoFileInputs?.forEach((ref) => {
-        ref.nativeElement.value = '';
-      });
+      this.fotoFileInputs?.forEach((ref) => { ref.nativeElement.value = ''; });
     }, 0);
   }
 
@@ -601,9 +545,7 @@ export class PropietarioDashboardComponent {
       if (!this.fotoFiles[i]) {
         this.casaForm.markAllAsTouched();
         this.fotosRows.controls.forEach((c) => c.markAllAsTouched());
-        this.error.set(
-          'Selecciona un archivo de imagen en cada fila de fotos (el backend espera archivos, no URLs).'
-        );
+        this.error.set('Selecciona un archivo de imagen en cada fila de fotos.');
         return;
       }
     }
@@ -614,13 +556,10 @@ export class PropietarioDashboardComponent {
       return;
     }
     const c = this.casaForm.getRawValue();
-    const descripcionesFotos = this.fotosRows.controls.map((ctrl) =>
-      String(ctrl.get('descripcion')?.value ?? '').trim()
-    );
+    const descripcionesFotos = this.fotosRows.controls.map((ctrl) => String(ctrl.get('descripcion')?.value ?? '').trim());
     const fotos: File[] = [];
-    for (let i = 0; i < this.fotosRows.length; i++) {
-      fotos.push(this.fotoFiles[i]!);
-    }
+    for (let i = 0; i < this.fotosRows.length; i++) fotos.push(this.fotoFiles[i]!);
+
     const dto = new CasaRuralRequestDTO({
       poblacion: String(c.poblacion ?? '').trim(),
       descripcion: String(c.descripcion ?? '').trim(),
@@ -634,37 +573,35 @@ export class PropietarioDashboardComponent {
     });
 
     this.loading.set(true);
-    this.casaService
-      .registrarCasa(dto)
-      .subscribe({
-        next: (res) => {
-          this.loading.set(false);
-          this.ultimaAlta.set(res);
-          const list = [...this.readCasasLs()];
-          list.push({
-            codigoCasa: res.codigoCasa,
-            poblacion: res.poblacion,
-            descripcion: res.descripcion,
-            numeroDormitorios: res.numeroDormitorios,
-            numeroBanos: res.numeroBanos,
-            numeroCocinas: res.numeroCocinas,
-            numeroComedores: res.numeroComedores,
-            plazasGaraje: res.plazasGaraje,
-            previewUrl: res.fotos?.[0]?.url,
-            fotos: res.fotos ?? [],
-          });
-          this.persistCasas(list);
-          this.casaActivaDetalle.set(res);
-          this.codigoActivo.set(res.codigoCasa);
-          this.success.set(`Casa registrada. Código casa: ${res.codigoCasa}`);
-          void this.refrescarListas(res.codigoCasa);
-          this.resetFormularioAltaCasa();
-        },
-        error: (err: HttpErrorResponse) => {
-          this.loading.set(false);
-          this.error.set(readApiError(err));
-        },
-      });
+    this.casaService.registrarCasa(dto).subscribe({
+      next: (res) => {
+        this.loading.set(false);
+        this.ultimaAlta.set(res);
+        const list = [...this.readCasasLs()];
+        list.push({
+          codigoCasa: res.codigoCasa,
+          poblacion: res.poblacion,
+          descripcion: res.descripcion,
+          numeroDormitorios: res.numeroDormitorios,
+          numeroBanos: res.numeroBanos,
+          numeroCocinas: res.numeroCocinas,
+          numeroComedores: res.numeroComedores,
+          plazasGaraje: res.plazasGaraje,
+          previewUrl: res.fotos?.[0]?.url,
+          fotos: res.fotos ?? [],
+        });
+        this.persistCasas(list);
+        this.casaActivaDetalle.set(res);
+        this.codigoActivo.set(res.codigoCasa);
+        this.success.set(`Casa registrada. Código casa: ${res.codigoCasa}`);
+        void this.refrescarListas(res.codigoCasa);
+        this.resetFormularioAltaCasa();
+      },
+      error: (err: HttpErrorResponse) => {
+        this.loading.set(false);
+        this.error.set(readApiError(err));
+      },
+    });
   }
 
   protected seleccionarCasa(codigo: number) {
@@ -706,74 +643,99 @@ export class PropietarioDashboardComponent {
     });
   }
 
+  // ——— Reservas ———
+
+  protected cargarReservas() {
+    this.clearMessages();
+    this.loading.set(true);
+
+    this.reservaService.obtenerReservasPendientes().subscribe({
+      next: (data) => {
+        this.reservasPendientes.set(data);
+        this.loading.set(false);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.loading.set(false);
+        this.error.set(readApiError(err));
+      },
+    });
+
+    this.reservaService.obtenerNotificaciones().subscribe({
+      next: (data) => this.notificaciones.set(data),
+      error: (err: HttpErrorResponse) => this.error.set(readApiError(err)),
+    });
+  }
+
+  protected cancelarReserva(id: number) {
+    this.clearMessages();
+    this.loading.set(true);
+    this.reservaService.cancelarReserva(id).subscribe({
+      next: () => {
+        this.loading.set(false);
+        this.success.set(`Reserva #${id} cancelada correctamente`);
+        this.reservasPendientes.set(
+          this.reservasPendientes().filter((r) => r.id !== id)
+        );
+      },
+      error: (err: HttpErrorResponse) => {
+        this.loading.set(false);
+        this.error.set(readApiError(err));
+      },
+    });
+  }
+
+  // ——— Paquetes ———
+
   protected crearPaquete() {
     this.clearMessages();
     const codigo = this.codigoActivo();
-    if (codigo == null) {
-      this.error.set('Selecciona o registra una casa primero');
-      return;
-    }
-    if (this.paqueteForm.invalid) {
-      this.paqueteForm.markAllAsTouched();
-      return;
-    }
+    if (codigo == null) { this.error.set('Selecciona o registra una casa primero'); return; }
+    if (this.paqueteForm.invalid) { this.paqueteForm.markAllAsTouched(); return; }
     const v = this.paqueteForm.getRawValue();
     this.loading.set(true);
-    this.paqueteService
-      .crearPaquete(codigo, {
-        fechaInicio: v.fechaInicio,
-        fechaFin: v.fechaFin,
-        precio: v.precio,
-        tipoAlquiler: v.tipoAlquiler,
-      })
-      .subscribe({
-        next: () => {
-          this.loading.set(false);
-          this.success.set('Paquete creado');
-          this.paqueteForm.reset({
-            fechaInicio: '',
-            fechaFin: '',
-            precio: 100,
-            tipoAlquiler: TipoAlquiler.CASA_COMPLETA,
-          });
-          this.paqueteForm.markAsPristine();
-          this.paqueteForm.markAsUntouched();
-          void this.refrescarListas(codigo);
-        },
-        error: (err: HttpErrorResponse) => {
-          this.loading.set(false);
-          this.error.set(readApiError(err));
-        },
-      });
+    this.paqueteService.crearPaquete(codigo, {
+      fechaInicio: v.fechaInicio,
+      fechaFin: v.fechaFin,
+      precio: v.precio,
+      tipoAlquiler: v.tipoAlquiler,
+    }).subscribe({
+      next: () => {
+        this.loading.set(false);
+        this.success.set('Paquete creado');
+        this.paqueteForm.reset({ fechaInicio: '', fechaFin: '', precio: 100, tipoAlquiler: TipoAlquiler.CASA_COMPLETA });
+        this.paqueteForm.markAsPristine();
+        this.paqueteForm.markAsUntouched();
+        void this.refrescarListas(codigo);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.loading.set(false);
+        this.error.set(readApiError(err));
+      },
+    });
   }
 
   protected actualizarPaquete() {
     this.clearMessages();
-    if (this.paqueteEditForm.invalid) {
-      this.paqueteEditForm.markAllAsTouched();
-      return;
-    }
+    if (this.paqueteEditForm.invalid) { this.paqueteEditForm.markAllAsTouched(); return; }
     const v = this.paqueteEditForm.getRawValue();
     this.loading.set(true);
-    this.paqueteService
-      .actualizarPaquete(v.idPaquete, {
-        fechaInicio: v.fechaInicio,
-        fechaFin: v.fechaFin,
-        precio: v.precio,
-        tipoAlquiler: v.tipoAlquiler,
-      })
-      .subscribe({
-        next: () => {
-          this.loading.set(false);
-          this.success.set('Paquete actualizado');
-          const c = this.codigoActivo();
-          if (c != null) void this.refrescarListas(c);
-        },
-        error: (err: HttpErrorResponse) => {
-          this.loading.set(false);
-          this.error.set(readApiError(err));
-        },
-      });
+    this.paqueteService.actualizarPaquete(v.idPaquete, {
+      fechaInicio: v.fechaInicio,
+      fechaFin: v.fechaFin,
+      precio: v.precio,
+      tipoAlquiler: v.tipoAlquiler,
+    }).subscribe({
+      next: () => {
+        this.loading.set(false);
+        this.success.set('Paquete actualizado');
+        const c = this.codigoActivo();
+        if (c != null) void this.refrescarListas(c);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.loading.set(false);
+        this.error.set(readApiError(err));
+      },
+    });
   }
 
   protected rellenarEdicionPaquete(p: PaqueteAlquilerResponse) {
@@ -786,100 +748,201 @@ export class PropietarioDashboardComponent {
     });
   }
 
+  // ——— Dormitorios ———
+
   protected registrarDormitorio() {
     this.clearMessages();
     const codigo = this.codigoActivo();
-    if (codigo == null) {
-      this.error.set('Sin casa activa');
-      return;
-    }
-    if (this.dormForm.invalid) {
-      this.dormForm.markAllAsTouched();
-      return;
-    }
+    if (codigo == null) { this.error.set('Sin casa activa'); return; }
+    if (this.dormForm.invalid) { this.dormForm.markAllAsTouched(); return; }
     const v = this.dormForm.getRawValue();
     if (v.tieneBano && this.cupoBanosLleno()) {
       const mb = this.maxBanosPermitidos();
-      this.error.set(
-        mb != null
-          ? `Has alcanzado el máximo de baños declarados en la ficha (${mb}). Quita «Tiene baño» en este dormitorio o revisa los ya registrados.`
-          : 'No se pueden asignar más baños de los declarados en la ficha.'
-      );
+      this.error.set(mb != null
+        ? `Has alcanzado el máximo de baños declarados en la ficha (${mb}).`
+        : 'No se pueden asignar más baños de los declarados en la ficha.');
       return;
     }
     if (this.cupoDormitoriosLleno()) {
       const max = this.maxDormitoriosPermitidos();
-      this.error.set(
-        max != null
-          ? `No se pueden registrar más dormitorios de los permitidos (${max}).`
-          : 'No se pueden registrar más dormitorios de los permitidos.'
-      );
+      this.error.set(max != null
+        ? `No se pueden registrar más dormitorios de los permitidos (${max}).`
+        : 'No se pueden registrar más dormitorios de los permitidos.');
       return;
     }
     this.loading.set(true);
-    this.dormitorioService
-      .registrarDormitorio(codigo, {
-        numeroCamas: v.numeroCamas,
-        nombre: v.nombre.trim(),
-        tipoCama: v.tipoCama,
-        tieneBano: v.tieneBano,
-      })
-      .subscribe({
-        next: () => {
-          this.loading.set(false);
-          this.success.set('Dormitorio registrado');
-          void this.refrescarListas(codigo);
-        },
-        error: (err: HttpErrorResponse) => {
-          this.loading.set(false);
-          let msg = readApiError(err);
-          if (
-            /dormitorio/i.test(msg) &&
-            v.tieneBano &&
-            this.cupoBanosLleno()
-          ) {
-            msg =
-              'No se pueden asignar más baños de los declarados en la ficha de la casa.';
-          }
-          this.error.set(msg);
-        },
-      });
+    this.dormitorioService.registrarDormitorio(codigo, {
+      numeroCamas: v.numeroCamas,
+      nombre: v.nombre.trim(),
+      tipoCama: v.tipoCama,
+      tieneBano: v.tieneBano,
+    }).subscribe({
+      next: () => {
+        this.loading.set(false);
+        this.success.set('Dormitorio registrado');
+        void this.refrescarListas(codigo);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.loading.set(false);
+        let msg = readApiError(err);
+        if (/dormitorio/i.test(msg) && v.tieneBano && this.cupoBanosLleno()) {
+          msg = 'No se pueden asignar más baños de los declarados en la ficha de la casa.';
+        }
+        this.error.set(msg);
+      },
+    });
   }
+
+  // ——— Cocinas ———
 
   protected registrarCocina() {
     this.clearMessages();
     const codigo = this.codigoActivo();
-    if (codigo == null) {
-      this.error.set('Sin casa activa');
-      return;
-    }
+    if (codigo == null) { this.error.set('Sin casa activa'); return; }
     if (this.cupoCocinasLleno()) {
       const max = this.maxCocinasPermitidas();
-      this.error.set(
-        max != null
-          ? `No se pueden registrar más cocinas de las permitidas (${max}).`
-          : 'No se pueden registrar más cocinas de las permitidas.'
-      );
+      this.error.set(max != null
+        ? `No se pueden registrar más cocinas de las permitidas (${max}).`
+        : 'No se pueden registrar más cocinas de las permitidas.');
       return;
     }
     const v = this.cocinaForm.getRawValue();
     this.loading.set(true);
-    this.cocinaService
-      .registrarCocina(codigo, {
-        tieneLavavajillas: v.tieneLavavajillas,
-        tieneLavadora: v.tieneLavadora,
-      })
-      .subscribe({
-        next: () => {
-          this.loading.set(false);
-          this.success.set('Cocina registrada');
-          void this.refrescarListas(codigo);
-        },
-        error: (err: HttpErrorResponse) => {
-          this.loading.set(false);
-          this.error.set(readApiError(err));
-        },
-      });
+    this.cocinaService.registrarCocina(codigo, {
+      tieneLavavajillas: v.tieneLavavajillas,
+      tieneLavadora: v.tieneLavadora,
+    }).subscribe({
+      next: () => {
+        this.loading.set(false);
+        this.success.set('Cocina registrada');
+        void this.refrescarListas(codigo);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.loading.set(false);
+        this.error.set(readApiError(err));
+      },
+    });
+  }
+  protected abrirModalEliminar(): void {
+    // abrir modal de confirmación
+    this.modalEliminarAbierta.set(true);
+  }
+  protected cerrarModalEliminar(): void {
+    this.modalEliminarAbierta.set(false);
+  }
+  protected confirmarEliminarCasa(): void {
+    // ejecuta el borrado real (misma lógica que antes tras el confirm())
+    this.clearMessages();
+    const codigo = this.codigoActivo();
+    if (codigo == null) {
+      this.error.set('No hay una casa seleccionada.');
+      this.cerrarModalEliminar();
+      return;
+    }
+    this.modalEliminarAbierta.set(false);
+    this.loading.set(true);
+    this.casaService.eliminarCasa(codigo).subscribe({
+      next: () => {
+        this.loading.set(false);
+        // quitar la casa del listado local
+        const casasActualizadas = this
+          .casasLocales()
+          .filter(c => c.codigoCasa !== codigo);
+        this.persistCasas(casasActualizadas);
+        // eliminar la casa también del catálogo del cliente (localStorage)
+        this.eliminarDelCatalogoCliente(codigo);
+        // limpiar datos asociados
+        this.paquetes.set([]);
+        this.dormitorios.set([]);
+        this.cocinas.set([]);
+        this.casaActivaDetalle.set(null);
+        this.ultimaAlta.set(null);
+        // si quedan casas seleccionar otra
+        if (casasActualizadas.length > 0) {
+          const siguienteCasa = casasActualizadas[0].codigoCasa;
+          this.codigoActivo.set(siguienteCasa);
+          void this.refrescarListas(siguienteCasa);
+        } else {
+          this.codigoActivo.set(null);
+        }
+        this.success.set('Casa eliminada correctamente.');
+      },
+      error: (err: HttpErrorResponse) => {
+        this.loading.set(false);
+        this.error.set(readApiError(err));
+      },
+    });
+  }
+
+  /** Elimina una casa del catálogo local del cliente en localStorage. */
+  private eliminarDelCatalogoCliente(codigoCasa: number): void {
+    try {
+      const catalogoKey = 'cliente_catalogo_casas';
+      const catalogo = localStorage.getItem(catalogoKey);
+      if (catalogo) {
+        const list = JSON.parse(catalogo) as Array<{ codigoCasa: number }>;
+        const filtered = list.filter((x) => x.codigoCasa !== codigoCasa);
+        localStorage.setItem(catalogoKey, JSON.stringify(filtered));
+      }
+    } catch {
+      // ignorar errores de localStorage
+    }
+  }
+
+  protected iniciarDivision(p: { idPaquete: number; fechaInicio: string; fechaFin: string; tipoAlquiler: any }) {
+    this.clearMessages();
+    this.paqueteDividirId.set(p.idPaquete);
+    const mid = p.fechaInicio;
+    this.dividirSubPaquetes.set([
+      { fechaInicio: p.fechaInicio, fechaFin: '', precio: 0, tipoAlquiler: p.tipoAlquiler },
+      { fechaInicio: '', fechaFin: p.fechaFin, precio: 0, tipoAlquiler: p.tipoAlquiler },
+    ]);
+  }
+
+  protected cancelarDivision() {
+    this.paqueteDividirId.set(null);
+    this.dividirSubPaquetes.set([]);
+  }
+
+  protected agregarSubPaquete() {
+    const orig = this.paquetes().find(p => p.idPaquete === this.paqueteDividirId());
+    this.dividirSubPaquetes.set([
+      ...this.dividirSubPaquetes(),
+      { fechaInicio: '', fechaFin: '', precio: 0, tipoAlquiler: orig?.tipoAlquiler ?? undefined },
+    ]);
+  }
+
+  protected quitarSubPaquete(i: number) {
+    const arr = [...this.dividirSubPaquetes()];
+    arr.splice(i, 1);
+    this.dividirSubPaquetes.set(arr);
+  }
+
+  protected actualizarSubPaquete(i: number, campo: keyof SubPaqueteRequest, valor: any) {
+    const arr = [...this.dividirSubPaquetes()];
+    arr[i] = { ...arr[i], [campo]: campo === 'precio' ? Number(valor) : valor };
+    this.dividirSubPaquetes.set(arr);
+  }
+
+  protected ejecutarDivision() {
+    this.clearMessages();
+    const id = this.paqueteDividirId();
+    if (id == null) return;
+    this.loadingDividir.set(true);
+    const body: DividirPaqueteRequest = { subPaquetes: this.dividirSubPaquetes() };
+    this.paqueteService.dividirPaquete(id, body).subscribe({
+      next: () => {
+        this.loadingDividir.set(false);
+        this.success.set('Paquete dividido correctamente.');
+        this.cancelarDivision();
+        const c = this.codigoActivo();
+        if (c != null) void this.refrescarListas(c);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.loadingDividir.set(false);
+        this.error.set(readApiError(err));
+      },
+    });
   }
 
   protected logout() {
@@ -887,6 +950,8 @@ export class PropietarioDashboardComponent {
     localStorage.removeItem('token');
     void this.router.navigateByUrl('/login');
   }
+
+
 
   protected clearMessages() {
     this.error.set(null);

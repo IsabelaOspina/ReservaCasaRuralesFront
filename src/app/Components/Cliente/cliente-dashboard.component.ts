@@ -27,6 +27,7 @@ import { PagoResponse } from '../../DTO/pago-response';
 import { FotoResponse } from '../../DTO/Foto-response';
 import { PagoInfoResponse, PagoInfoResponseAmigable, transformPagoInfoResponse } from '../../DTO/pagoinfo-response';
 import { TipoAlquiler } from '../../DTO/paquete-request';
+import { OcupacionPaqueteResponse } from '../../DTO/ocupacion-response';
 
 function hoyLocalISODate(): string {
   const h = new Date();
@@ -102,6 +103,15 @@ export class ClienteDashboardComponent {
   protected readonly ultimaReserva = signal<ReservaResponse | null>(null);
   protected readonly loadingReserva = signal(false);
 
+  protected readonly misReservas = signal<ReservaResponse[]>([]);
+  protected readonly loadingMisReservas = signal(false);
+  protected readonly casaEnteraBloqueada = signal(false);
+
+  protected readonly ocupacionPaquetes = signal<OcupacionPaqueteResponse[]>([]);
+  protected readonly loadingOcupacion = signal(false);
+  protected readonly calMes = signal(new Date().getMonth());
+  protected readonly calAnio = signal(new Date().getFullYear());
+
   protected readonly pagoInfo = signal(
     null as ReturnType<typeof transformPagoInfoResponse> | null
   );
@@ -131,7 +141,7 @@ export class ClienteDashboardComponent {
   protected readonly fichaCasaCatalogo = signal<CasaClienteCatalogo | null>(null);
   protected readonly loadingGaleriaCasa = signal(false);
   protected readonly navActiva = signal<
-    'flujo' | 'reservas' | 'disponibilidad' | 'pagos'
+    'flujo' | 'reservas' | 'disponibilidad' | 'pagos' | 'misreservas'
   >('flujo');
 
   protected readonly codigoForm = this.fb.nonNullable.group({
@@ -246,6 +256,13 @@ export class ClienteDashboardComponent {
     ) as CasaClienteCatalogo;
     if (i >= 0) list[i] = { ...list[i], ...defined };
     else list.push(defined);
+    this.persistCatalogo(list);
+    this.refrescarListadoCompleto();
+  }
+
+  /** Elimina una casa del catálogo local del cliente. */
+  private eliminarDelCatalogo(codigoCasa: number) {
+    const list = this.readCatalogo().filter((x) => x.codigoCasa !== codigoCasa);
     this.persistCatalogo(list);
     this.refrescarListadoCompleto();
   }
@@ -508,13 +525,14 @@ export class ClienteDashboardComponent {
     this.cargarDatosCasa(c.codigoCasa);
   }
 
-  protected irNav(dest: 'flujo' | 'reservas' | 'disponibilidad' | 'pagos') {
+  protected irNav(dest: 'flujo' | 'reservas' | 'disponibilidad' | 'pagos' | 'misreservas') {
     this.navActiva.set(dest);
     const map: Record<typeof dest, string> = {
       flujo: 'sec-casas',
       reservas: 'sec-reserva',
       disponibilidad: 'sec-disponibilidad',
       pagos: 'sec-pagos',
+      misreservas: 'sec-misreservas',
     };
     const id = map[dest];
     queueMicrotask(() =>
@@ -662,7 +680,8 @@ export class ClienteDashboardComponent {
     const id = this.reservaForm.getRawValue().paqueteId;
     if (!id) return false;
     const p = this.paquetes().find((x) => x.idPaquete === id);
-    return p?.tipoAlquiler === TipoAlquiler.POR_HABITACIONES;
+    return p?.tipoAlquiler === TipoAlquiler.POR_HABITACIONES ||
+      p?.tipoAlquiler === TipoAlquiler.CASA_COMPLETA_Y_HABITACIONES;
   }
 
   private paqueteSeleccionado(): PaqueteAlquilerResponse | null {
@@ -747,11 +766,30 @@ export class ClienteDashboardComponent {
 
   protected seleccionarPaquete(id: number) {
     this.reservaForm.patchValue({ paqueteId: id });
+    const paquete = this.paquetes().find(p => p.idPaquete === id);
+    if (paquete) {
+      this.verificarCasaEntera(paquete);
+    }
   }
 
   protected urlFotoSegura(url: string | undefined | null): string | null {
     return resolveFotoSrc(url);
   }
+
+  protected verificarCasaEntera(paquete: PaqueteAlquilerResponse) {
+      if (paquete?.tipoAlquiler === TipoAlquiler.CASA_COMPLETA_Y_HABITACIONES) {
+        this.paqueteService.casaEnteraDisponible(paquete.idPaquete).subscribe({
+          next: (disponible) => {
+            this.casaEnteraBloqueada.set(!disponible);
+          },
+          error: () => {
+            this.casaEnteraBloqueada.set(false);
+          }
+        });
+      } else {
+        this.casaEnteraBloqueada.set(false);
+      }
+    }
 
   protected fieldState(
     form: 'disp' | 'reserva' | 'pago',
@@ -773,8 +811,12 @@ export class ClienteDashboardComponent {
     const tel = this.reservaForm.get('telefonoContacto');
     if (!tel?.valid) return false;
     if (this.mostrarSeleccionDormitoriosReserva() && this.selectedDormId() == null) {
-      return false;
+      const p = this.paqueteSeleccionado();
+      if (p?.tipoAlquiler === TipoAlquiler.POR_HABITACIONES) {
+        return false;
+      }
     }
+    if (this.casaEnteraBloqueada()) return false;
     return this.reservaForm.valid;
   }
 
@@ -894,7 +936,8 @@ export class ClienteDashboardComponent {
           numeroComedores: ficha.numeroComedores,
           plazasGaraje: ficha.plazasGaraje,
         });
-        this.setMsgCasas('ok', `Ficha cargada: ${nombre}.`);
+        this.cargarOcupacion();
+        this.setMsgCasas('ok', `Datos cargados para ${nombre}.`);
       },
       error: (err: HttpErrorResponse) => {
         this.loadingPaquetes.set(false);
@@ -976,8 +1019,11 @@ export class ClienteDashboardComponent {
       return;
     }
     if (this.mostrarSeleccionDormitoriosReserva() && this.selectedDormId() == null) {
-      this.setMsgReserva('err', 'Selecciona una habitación para el paquete por habitaciones.');
-      return;
+      const p = this.paqueteSeleccionado();
+      if (p?.tipoAlquiler === TipoAlquiler.POR_HABITACIONES) {
+        this.setMsgReserva('err', 'Selecciona una habitación para el paquete por habitaciones.');
+        return;
+      }
     }
     this.loadingReserva.set(true);
     const r = this.reservaForm.getRawValue();
@@ -1164,6 +1210,125 @@ export class ClienteDashboardComponent {
         this.setPagoFeedback('error', readApiError(err));
       },
     });
+  }
+
+protected diasDelMes(): { dia: number; ocupado: boolean; estado?: string; fueraPaquete: boolean }[] {
+    const m = this.calMes();
+    const y = this.calAnio();
+    const totalDias = new Date(y, m + 1, 0).getDate();
+    const result: { dia: number; ocupado: boolean; estado?: string; fueraPaquete: boolean }[] = [];
+
+    const selectedId = this.reservaForm.getRawValue().paqueteId;
+    const paqueteSel = this.paquetes().find(p => p.idPaquete === selectedId);
+    const ocupacionSel = this.ocupacionPaquetes().find(pq => pq.idPaquete === selectedId);
+
+    for (let d = 1; d <= totalDias; d++) {
+      const fecha = new Date(y, m, d);
+      const iso = this.dateToIso(fecha);
+
+      // Verificar si el día está dentro del paquete seleccionado
+      const dentroPaquete = paqueteSel
+        ? iso >= paqueteSel.fechaInicio && iso <= paqueteSel.fechaFin
+        : false;
+
+      let ocupado = false;
+      let estado: string | undefined;
+      if (dentroPaquete && ocupacionSel) {
+        for (const po of ocupacionSel.periodosOcupados) {
+          if (iso >= po.fechaInicio && iso < po.fechaFin) {
+            ocupado = true;
+            estado = po.estado;
+            break;
+          }
+        }
+      }
+      result.push({ dia: d, ocupado, estado, fueraPaquete: !dentroPaquete });
+    }
+    return result;
+  }
+
+  protected primerDiaSemanaLunes(): number {
+    const day = new Date(this.calAnio(), this.calMes(), 1).getDay();
+    return (day + 6) % 7; // 0=Lun, 1=Mar, ..., 6=Dom
+  }
+
+  protected nombreMes(): string {
+    return new Date(this.calAnio(), this.calMes(), 1)
+      .toLocaleString('es', { month: 'long', year: 'numeric' });
+  }
+
+  protected mesAnterior() {
+    let m = this.calMes() - 1;
+    let y = this.calAnio();
+    if (m < 0) { m = 11; y--; }
+    this.calMes.set(m);
+    this.calAnio.set(y);
+  }
+
+  protected mesSiguiente() {
+    let m = this.calMes() + 1;
+    let y = this.calAnio();
+    if (m > 11) { m = 0; y++; }
+    this.calMes.set(m);
+    this.calAnio.set(y);
+  }
+
+  protected seleccionarDiaCalendario(dia: number) {
+    const iso = this.dateToIso(new Date(this.calAnio(), this.calMes(), dia));
+    this.dispForm.patchValue({ fechaInicio: iso });
+    this.reservaForm.patchValue({ fechaInicio: iso });
+  }
+
+  private dateToIso(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+  }
+
+  protected esFechaSeleccionada(dia: number): boolean {
+    const sel = this.dispForm.getRawValue().fechaInicio;
+    if (!sel) return false;
+    const iso = this.dateToIso(new Date(this.calAnio(), this.calMes(), dia));
+    return iso === sel;
+  }
+    protected cargarOcupacion() {
+    const casa = this.codigoCasa();
+    if (casa == null) return;
+    this.loadingOcupacion.set(true);
+    this.paqueteService.obtenerOcupacionPorCasa(casa).subscribe({
+      next: (data) => {
+        this.loadingOcupacion.set(false);
+        this.ocupacionPaquetes.set(data);
+      },
+      error: () => {
+        this.loadingOcupacion.set(false);
+        this.ocupacionPaquetes.set([]);
+      },
+    });
+  }
+
+  protected cargarMisReservas() {
+    this.loadingMisReservas.set(true);
+    this.reservaService.obtenerMisReservas().subscribe({
+      next: (reservas) => {
+        this.loadingMisReservas.set(false);
+        this.misReservas.set(reservas);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.loadingMisReservas.set(false);
+        this.misReservas.set([]);
+      },
+    });
+  }
+
+  protected etiquetaEstado(estado: string): string {
+    switch (estado) {
+      case 'PENDIENTE': return 'Pendiente';
+      case 'CONFIRMADA': return 'Confirmada';
+      case 'CANCELADA': return 'Cancelada';
+      default: return estado;
+    }
   }
 
   protected logout() {
