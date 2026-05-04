@@ -25,8 +25,9 @@ import { DormitorioService } from '../../Services/dormitorio.service';
 import { CocinaService } from '../../Services/cocina.service';
 import { PagoService } from '../../Services/pago.service';
 import { readApiError } from '../../core/http-error.util';
-import { clearDashboardBrowserCacheOnLogout } from '../../core/browser-app-cache.util';
+import { clearPropietarioCasasLocalCache } from '../../core/dashboard-browser-cache.util';
 import { propietarioCasasLocalStorageKey } from '../../core/auth/propietario-storage.util';
+import { readNumericUserIdFromToken } from '../../core/auth/jwt.util';
 import { CasaRuralRequestDTO } from '../../DTO/CasaRural-request';
 import { CasaRuralResponse } from '../../DTO/CasaRural-response';
 import { FotoResponse } from '../../DTO/Foto-response';
@@ -35,40 +36,13 @@ import { TipoAlquiler } from '../../DTO/paquete-request';
 import { DormitorioResponse } from '../../DTO/Dormitorio-response';
 import { CocinaResponse } from '../../DTO/Cocina-response';
 import { TipoCama } from '../../DTO/Dormitorio-request';
-import { MetodoPago, PagoRequest } from '../../DTO/pago-request';
+import { MetodoPago } from '../../DTO/pago-request';
 import { PagoResponse } from '../../DTO/pago-response';
 import {
   PagoInfoResponse,
   PagoInfoResponseAmigable,
   transformPagoInfoResponse,
 } from '../../DTO/pagoinfo-response';
-
-function hoyLocalISODate(): string {
-  const h = new Date();
-  const y = h.getFullYear();
-  const m = String(h.getMonth() + 1).padStart(2, '0');
-  const d = String(h.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
-function fechaPagoNoPasada(control: AbstractControl): { fechaPagoPasada: true } | null {
-  const v = control.value;
-  if (v === null || v === undefined || v === '') return null;
-  if (typeof v !== 'string') return { fechaPagoPasada: true };
-  const s = v.trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return { fechaPagoPasada: true };
-  if (s < hoyLocalISODate()) return { fechaPagoPasada: true };
-  return null;
-}
-
-/** Vacío = válido; si hay fecha, no puede ser anterior a hoy. */
-function fechaPagoOpcionalNoPasada(): ValidatorFn {
-  return (control: AbstractControl): ValidationErrors | null => {
-    const v = control.value;
-    if (v === null || v === undefined || String(v).trim() === '') return null;
-    return fechaPagoNoPasada(control);
-  };
-}
 
 function rangoFechasPaquete(): ValidatorFn {
   return (group: AbstractControl): ValidationErrors | null => {
@@ -121,6 +95,10 @@ export class PropietarioDashboardComponent {
   >('casa');
 
   protected readonly casasLocales = signal<CasaRegistradaLocal[]>([]);
+  /** True hasta terminar el primer GET de casas del servidor (o error). */
+  protected readonly cargandoCasasDesdeApi = signal(true);
+  /** Si el listado remoto falla (404, red, etc.). */
+  protected readonly avisoListaCasasApi = signal<string | null>(null);
   protected readonly codigoActivo = signal<number | null>(null);
   protected readonly ultimaAlta = signal<CasaRuralResponse | null>(null);
 
@@ -190,6 +168,8 @@ export class PropietarioDashboardComponent {
   });
 
   protected readonly loadingPagosProp = signal(false);
+  /** Pago # en curso de confirmación (botón deshabilitado). */
+  protected readonly confirmandoPagoId = signal<number | null>(null);
   protected readonly propPagoInfo = signal(
     null as ReturnType<typeof transformPagoInfoResponse> | null
   );
@@ -201,16 +181,7 @@ export class PropietarioDashboardComponent {
 
   protected readonly propPagoForm = this.fb.group({
     reservaId: [null as number | null, [Validators.required, Validators.min(1)]],
-    monto: [0, [Validators.required, Validators.min(0.01)]],
-    metodoPago: [MetodoPago.TRANSFERENCIA as MetodoPago, Validators.required],
-    fechaPago: ['', [fechaPagoOpcionalNoPasada()]],
   });
-
-  protected readonly metodosPagoProp = [
-    MetodoPago.TRANSFERENCIA,
-    MetodoPago.TARJETA,
-    MetodoPago.EFECTIVO,
-  ];
 
   protected tituloCasaActiva(): string {
     const id = this.codigoActivo();
@@ -411,9 +382,8 @@ export class PropietarioDashboardComponent {
     const last = this.casasLocales()[0]?.codigoCasa;
     if (last) {
       this.codigoActivo.set(last);
-      this.refrescarListas(last);
     }
-    this.propPagoForm.patchValue({ fechaPago: hoyLocalISODate() });
+    this.sincronizarCasasDesdeServidor();
   }
 
   private lsCasasKey(): string {
@@ -432,6 +402,102 @@ export class PropietarioDashboardComponent {
   private persistCasas(list: CasaRegistradaLocal[]) {
     localStorage.setItem(this.lsCasasKey(), JSON.stringify(list));
     this.casasLocales.set(list);
+  }
+
+  /** Une lo guardado en el navegador con lo que devuelve el API (prioridad a datos del servidor). */
+  /**
+   * Si el listado trae `propietarioId` y el JWT tiene id numérico, deja solo las casas de ese propietario.
+   * Si el API no manda `propietarioId`, se devuelve el listado tal cual (comportamiento actual del backend).
+   */
+  private filtrarCasasApiSiCorresponde(api: CasaRuralResponse[]): CasaRuralResponse[] {
+    const ownerId = readNumericUserIdFromToken(
+      typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null
+    );
+    if (ownerId == null || api.length === 0) return api;
+    const algunaConProp = api.some(
+      (c) => c.propietarioId != null && Number.isFinite(Number(c.propietarioId))
+    );
+    if (!algunaConProp) return api;
+    return api.filter((c) => Number(c.propietarioId) === ownerId);
+  }
+
+  private mergeCasasLocalesConApi(
+    api: CasaRuralResponse[],
+    local: CasaRegistradaLocal[]
+  ): CasaRegistradaLocal[] {
+    const byCode = new Map<number, CasaRegistradaLocal>();
+    for (const l of local) {
+      if (l?.codigoCasa != null && Number.isFinite(l.codigoCasa) && l.codigoCasa > 0) {
+        byCode.set(l.codigoCasa, { ...l });
+      }
+    }
+    for (const r of api) {
+      if (!r || !Number.isFinite(r.codigoCasa) || r.codigoCasa < 1) continue;
+      const prev = byCode.get(r.codigoCasa);
+      byCode.set(r.codigoCasa, {
+        codigoCasa: r.codigoCasa,
+        poblacion: r.poblacion,
+        descripcion: r.descripcion,
+        numeroDormitorios: r.numeroDormitorios,
+        numeroBanos: r.numeroBanos,
+        numeroCocinas: r.numeroCocinas,
+        numeroComedores: r.numeroComedores,
+        plazasGaraje: r.plazasGaraje,
+        previewUrl: prev?.previewUrl ?? r.fotos?.[0]?.url,
+        fotos: r.fotos?.length ? r.fotos : prev?.fotos,
+      });
+    }
+    return [...byCode.values()].sort((a, b) => a.codigoCasa - b.codigoCasa);
+  }
+
+  /** Carga casas del backend y las fusiona con localStorage. */
+  private sincronizarCasasDesdeServidor(): void {
+    this.avisoListaCasasApi.set(null);
+    this.casaService.listarCasasPropietario().subscribe({
+      next: (api) => {
+        const filtered = this.filtrarCasasApiSiCorresponde(api);
+        const merged =
+          filtered.length === 0
+            ? []
+            : this.mergeCasasLocalesConApi(filtered, this.readCasasLs());
+        this.persistCasas(merged);
+        if (merged.length === 0) {
+          this.codigoActivo.set(null);
+          this.casaActivaDetalle.set(null);
+          this.paquetes.set([]);
+          this.dormitorios.set([]);
+          this.cocinas.set([]);
+        } else {
+          const active = this.codigoActivo();
+          const codigos = new Set(merged.map((m) => m.codigoCasa));
+          if (active == null || !codigos.has(active)) {
+            this.codigoActivo.set(merged[0].codigoCasa);
+            void this.refrescarListas(merged[0].codigoCasa);
+          } else {
+            void this.refrescarListas(active);
+          }
+        }
+        this.cargandoCasasDesdeApi.set(false);
+      },
+      error: (err: unknown) => {
+        this.cargandoCasasDesdeApi.set(false);
+        const texto =
+          err instanceof HttpErrorResponse
+            ? readApiError(err)
+            : 'No se pudo cargar la lista de casas desde el servidor.';
+        this.avisoListaCasasApi.set(texto);
+        const last = this.codigoActivo();
+        if (last != null) {
+          void this.refrescarListas(last);
+        }
+      },
+    });
+  }
+
+  private upsertCasaLocalDesdeApi(res: CasaRuralResponse): void {
+    if (!res?.codigoCasa) return;
+    const merged = this.mergeCasasLocalesConApi([res], this.readCasasLs());
+    this.persistCasas(merged);
   }
 
   /** Cupos conocidos sin GET completo (solo para límites UI). */
@@ -613,6 +679,9 @@ export class PropietarioDashboardComponent {
     if (pre) this.casaActivaDetalle.set(pre);
 
     forkJoin({
+      detalle: this.casaService
+        .obtenerCasaPorCodigo(codigo)
+        .pipe(catchError(() => of(null as CasaRuralResponse | null))),
       paquetes: this.paqueteService.listarPaquetesPorCasa(codigo),
       dormitorios: this.dormitorioService.listarDormitorios(codigo),
       cocinas: this.cocinaService.listarCocinas(codigo),
@@ -621,8 +690,13 @@ export class PropietarioDashboardComponent {
         this.paquetes.set(res.paquetes);
         this.dormitorios.set(res.dormitorios);
         this.cocinas.set(res.cocinas);
-        const fallback = this.construirCasaDetalleDesdeLocal(codigo);
-        this.casaActivaDetalle.set(fallback);
+        if (res.detalle) {
+          this.casaActivaDetalle.set(res.detalle);
+          this.upsertCasaLocalDesdeApi(res.detalle);
+        } else {
+          const fallback = this.construirCasaDetalleDesdeLocal(codigo);
+          this.casaActivaDetalle.set(fallback);
+        }
         this.loading.set(false);
       },
       error: (err: HttpErrorResponse) => {
@@ -809,7 +883,7 @@ export class PropietarioDashboardComponent {
   }
 
   protected logout() {
-    clearDashboardBrowserCacheOnLogout();
+    clearPropietarioCasasLocalCache();
     localStorage.removeItem('token');
     void this.router.navigateByUrl('/login');
   }
@@ -858,11 +932,17 @@ export class PropietarioDashboardComponent {
     return [...map.values()].sort((a, b) => a.idPago - b.idPago);
   }
 
+  /** Solo pagos ya confirmados por ti cuentan como cobrado frente al total. */
   protected totalPagadoProp(): number {
     return this.propPagosLista().reduce((s, p) => {
+      if (p.confirmado !== true) return s;
       const m = Number(p.monto);
       return s + (Number.isFinite(m) ? m : 0);
     }, 0);
+  }
+
+  protected pagosPendientesProp(): PagoResponse[] {
+    return this.propPagosLista().filter((p) => p.confirmado !== true);
   }
 
   protected saldoRestanteProp(info: PagoInfoResponseAmigable): number {
@@ -876,10 +956,12 @@ export class PropietarioDashboardComponent {
     this.propPagoMensaje.set({ tipo, texto });
   }
 
-  protected cargarInfoPagoProp(opts?: { preserveBanner?: boolean }): void {
+  /** Carga resumen de importes, datos bancarios y lista de pagos de la reserva. */
+  protected consultarReservaPagosProp(opts?: { preserveBanner?: boolean }): void {
     if (!opts?.preserveBanner) this.propPagoMensaje.set(null);
     const id = this.parseReservaIdPropPago();
     if (id == null) {
+      this.propPagoForm.markAllAsTouched();
       this.setPropPagoFeedback('error', 'Indica un ID de reserva válido.');
       return;
     }
@@ -898,31 +980,7 @@ export class PropietarioDashboardComponent {
     });
   }
 
-  protected listarPagosReservaProp(opts?: { preserveBanner?: boolean }): void {
-    if (!opts?.preserveBanner) this.propPagoMensaje.set(null);
-    const id = this.parseReservaIdPropPago();
-    if (id == null) {
-      this.setPropPagoFeedback('error', 'Indica un ID de reserva válido.');
-      return;
-    }
-    this.loadingPagosProp.set(true);
-    this.fetchPagoInfoYPagosProp(id).subscribe({
-      next: ({ raw, pagos }) => {
-        this.loadingPagosProp.set(false);
-        this.aplicarRespuestaPropPago(id, raw, pagos);
-      },
-      error: (err: HttpErrorResponse) => {
-        this.loadingPagosProp.set(false);
-        this.propPagoInfo.set(null);
-        this.propPagosLista.set([]);
-        this.setPropPagoFeedback('error', readApiError(err));
-      },
-    });
-  }
-
-  protected fieldStatePropPago(
-    name: 'reservaId' | 'monto' | 'metodoPago' | 'fechaPago'
-  ): '' | 'invalid' | 'valid' {
+  protected fieldStatePropPago(name: 'reservaId'): '' | 'invalid' | 'valid' {
     const c = this.propPagoForm.get(name);
     if (!c) return '';
     if (!(c.dirty || c.touched)) return '';
@@ -938,104 +996,38 @@ export class PropietarioDashboardComponent {
     return map[m] ?? String(m);
   }
 
-  protected fechaMinimaPagoProp(): string {
-    return hoyLocalISODate();
-  }
-
-  protected canRegistrarPagoProp(): boolean {
+  protected puedeConsultarReservaPagosProp(): boolean {
     if (this.loadingPagosProp()) return false;
-    if (this.propPagoForm.get('reservaId')?.invalid) return false;
-    if (this.propPagoForm.get('monto')?.invalid) return false;
-    if (this.propPagoForm.get('metodoPago')?.invalid) return false;
-    if (this.propPagoForm.get('fechaPago')?.invalid) return false;
-    return true;
+    return this.propPagoForm.get('reservaId')?.valid === true;
   }
 
-  protected registrarPagoPropietario(): void {
-    this.propPagoMensaje.set(null);
-    this.propPagoForm.markAllAsTouched();
-    if (this.propPagoForm.invalid) {
-      if (this.propPagoForm.get('fechaPago')?.hasError('fechaPagoPasada')) {
-        this.setPropPagoFeedback('error', 'La fecha de pago no puede ser anterior a hoy.');
-      }
-      return;
-    }
-    const p = this.propPagoForm.getRawValue();
+  protected confirmandoPago(pagoId: number): boolean {
+    return this.confirmandoPagoId() === pagoId;
+  }
+
+  /** Confirma que el importe anotado por el cliente te consta recibido. */
+  protected confirmarRecepcionPagoProp(idPago: number): void {
     const reservaId = this.parseReservaIdPropPago();
-    const monto = p.monto;
-    const metodoPago = p.metodoPago;
-    if (reservaId == null || monto == null || metodoPago == null) {
-      this.propPagoForm.markAllAsTouched();
+    if (reservaId == null) {
+      this.setPropPagoFeedback('error', 'Indica un ID de reserva válido y consulta la reserva.');
       return;
     }
-    const montoNum = Number(monto);
-    if (!Number.isFinite(montoNum) || montoNum < 0.01) {
-      this.propPagoForm.markAllAsTouched();
-      return;
-    }
-    const montoJson = Math.round(montoNum * 100) / 100;
-
-    this.loadingPagosProp.set(true);
-    this.fetchPagoInfoYPagosProp(reservaId).subscribe({
-      next: ({ raw, pagos }) => {
-        this.aplicarRespuestaPropPago(reservaId, raw, pagos);
-        const info = this.propPagoInfo();
-        if (!info) {
-          this.loadingPagosProp.set(false);
-          this.setPropPagoFeedback('error', 'No se pudieron cargar los importes de esta reserva.');
-          return;
-        }
-        const pendiente = this.saldoRestanteProp(info);
-        if (montoJson > pendiente + 0.005) {
-          this.loadingPagosProp.set(false);
-          this.setPropPagoFeedback(
-            'error',
-            `El importe supera el saldo pendiente (${pendiente.toFixed(2)} €).`
-          );
-          return;
-        }
-
-        const body: PagoRequest = {
-          reservaId,
-          monto: montoJson,
-          metodoPago,
-          confirmado: true,
-        };
-        const fp = String(p.fechaPago ?? '').trim();
-        if (fp) body.fechaPago = fp;
-
-        this.pagoService.registrarPagoPropietario(body).subscribe({
-          next: () => {
-            this.loadingPagosProp.set(false);
-            this.setPropPagoFeedback('success', 'Cobro registrado correctamente.');
-            const rid = reservaId;
-            const hoy = hoyLocalISODate();
-            this.fetchPagoInfoYPagosProp(rid).subscribe({
-              next: ({ raw: r2, pagos: p2 }) => {
-                this.aplicarRespuestaPropPago(rid, r2, p2);
-              },
-              error: () => {
-                this.propPagoInfo.set(null);
-                this.propPagosLista.set([]);
-              },
-            });
-            this.propPagoForm.patchValue({
-              reservaId: rid,
-              monto: 0,
-              metodoPago: MetodoPago.TRANSFERENCIA,
-              fechaPago: hoy,
-            });
-            this.propPagoForm.markAsPristine();
-            this.propPagoForm.markAsUntouched();
-          },
-          error: (err: HttpErrorResponse) => {
-            this.loadingPagosProp.set(false);
-            this.setPropPagoFeedback('error', readApiError(err));
+    this.propPagoMensaje.set(null);
+    this.confirmandoPagoId.set(idPago);
+    this.pagoService.confirmarPagoComoPropietario(idPago).subscribe({
+      next: () => {
+        this.confirmandoPagoId.set(null);
+        this.setPropPagoFeedback('success', 'Pago confirmado: consta como recibido.');
+        this.fetchPagoInfoYPagosProp(reservaId).subscribe({
+          next: ({ raw, pagos }) => this.aplicarRespuestaPropPago(reservaId, raw, pagos),
+          error: () => {
+            this.propPagoInfo.set(null);
+            this.propPagosLista.set([]);
           },
         });
       },
       error: (err: HttpErrorResponse) => {
-        this.loadingPagosProp.set(false);
+        this.confirmandoPagoId.set(null);
         this.setPropPagoFeedback('error', readApiError(err));
       },
     });

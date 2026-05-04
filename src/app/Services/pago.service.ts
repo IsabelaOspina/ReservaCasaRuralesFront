@@ -25,11 +25,15 @@ export class PagoService {
   }
 
   /**
-   * Registro de cobro por propietario (mismo cuerpo que {@link registrarPago}).
-   * Requiere JWT con rol PROPIETARIO; mismo contrato de negocio que el alta del cliente.
+   * Marca un pago como confirmado por el propietario (el importe lo registró el cliente).
+   * Requiere JWT PROPIETARIO y que el pago pertenezca a una reserva de sus casas.
+   * Contrato esperado en backend: `POST .../pagos/{idPago}/confirmar-propietario` (sin cuerpo).
    */
-  registrarPagoPropietario(request: PagoRequest): Observable<PagoResponse> {
-    return this.http.post<PagoResponse>(`${this.apiUrl}/registro-propietario`, request);
+  confirmarPagoComoPropietario(idPago: number): Observable<PagoResponse> {
+    return this.http.post<PagoResponse>(
+      `${this.apiUrl}/${idPago}/confirmar-propietario`,
+      {}
+    );
   }
 
   /**

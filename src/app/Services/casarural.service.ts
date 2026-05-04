@@ -38,11 +38,25 @@ export class CasaRuralService {
       .pipe(map((raw) => normalizeCasaRuralResponse(raw)));
   }
 
-  /** GET /casa_rural/{codigo} — uso genérico si el backend lo expone. */
+  /**
+   * Ficha por código — `GET /casa_rural/{codigoCasa}` (autenticado).
+   * Uso panel propietario; no confundir con {@link obtenerCasaClientePorCodigo} (solo rol CLIENTE).
+   */
   obtenerCasaPorCodigo(codigoCasa: number): Observable<CasaRuralResponse> {
     return this.http
       .get<unknown>(`${this.apiUrl}/${codigoCasa}`)
       .pipe(map((raw) => normalizeCasaRuralResponse(raw)));
+  }
+
+  /**
+   * Listado con JWT de propietario (o cliente): mismo endpoint que el listado general.
+   * `GET /casa_rural/listar` — el backend admite CLIENTE y PROPIETARIO; hoy devuelve todas las casas
+   * (sin filtrar por propietario) salvo que evolucione el API.
+   */
+  listarCasasPropietario(): Observable<CasaRuralResponse[]> {
+    return this.http.get<unknown>(`${this.apiUrl}/listar`).pipe(
+      map((raw) => this.parseListadoCasas(raw))
+    );
   }
 
   /**
@@ -56,8 +70,7 @@ export class CasaRuralService {
   }
 
   /**
-   * Listado público de casas (ajusta la ruta si tu controlador usa otro mapping).
-   * Ej. GET /casa_rural/listar
+   * Listado general — `GET /casa_rural/listar` (JWT CLIENTE o PROPIETARIO según backend).
    */
   listarCasasDisponibles(): Observable<CasaRuralResponse[]> {
     return this.http.get<unknown>(`${this.apiUrl}/listar`).pipe(

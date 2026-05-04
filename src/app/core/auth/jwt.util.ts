@@ -116,6 +116,26 @@ export function hasRolePropietario(token: string): boolean {
 /**
  * Ruta tras login. Usa roles en lista + inferencia del payload (misma lógica que los guards).
  */
+/**
+ * Intenta leer un id de usuario numérico del JWT (Spring suele poner `userId`, `id` o `sub` numérico).
+ * Sirve para filtrar listados cuando el API incluye `propietarioId` en cada casa.
+ */
+export function readNumericUserIdFromToken(token: string | null): number | null {
+  const t = token?.trim();
+  if (!t) return null;
+  const p = decodeJwtPayload(t);
+  if (!p) return null;
+  for (const key of ['userId', 'id', 'usuarioId', 'propietarioId', 'uid'] as const) {
+    const n = Number(p[key]);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  const sub = p['sub'];
+  if (typeof sub === 'string' && /^\d+$/.test(sub.trim())) {
+    return Number(sub.trim());
+  }
+  return null;
+}
+
 export function resolvePostLoginRoute(token: string): '/cliente' | '/propietario' {
   const prop = hasRolePropietario(token);
   const cli = hasRoleCliente(token);

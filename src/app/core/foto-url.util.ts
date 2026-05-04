@@ -103,6 +103,15 @@ export function normalizeCasaRuralResponse(raw: unknown): CasaRuralResponse {
     fotos = [{ idFoto: 0, url: suelta, descripcion: '' }];
   }
 
+  const propietarioRaw = o['propietarioId'] ?? o['propietario_id'];
+  const propietarioIdNum = Number(propietarioRaw);
+  const propietarioId =
+    propietarioRaw != null &&
+    Number.isFinite(propietarioIdNum) &&
+    propietarioIdNum > 0
+      ? propietarioIdNum
+      : undefined;
+
   return {
     codigoCasa: Number(o['codigoCasa'] ?? o['codigo_casa'] ?? 0),
     poblacion: String(
@@ -113,11 +122,16 @@ export function normalizeCasaRuralResponse(raw: unknown): CasaRuralResponse {
         ''
     ),
     descripcion: String(o['descripcion'] ?? ''),
-    numeroDormitorios: Number(o['numeroDormitorios'] ?? 0),
-    numeroBanos: Number(o['numeroBanos'] ?? 0),
-    numeroCocinas: Number(o['numeroCocinas'] ?? 0),
-    numeroComedores: Number(o['numeroComedores'] ?? 0),
-    plazasGaraje: Number(o['plazasGaraje'] ?? 0),
+    numeroDormitorios: Number(
+      o['numeroDormitorios'] ?? o['numDormitorios'] ?? o['num_dormitorios'] ?? 0
+    ),
+    numeroBanos: Number(o['numeroBanos'] ?? o['numBanos'] ?? o['num_banos'] ?? 0),
+    numeroCocinas: Number(o['numeroCocinas'] ?? o['numCocinas'] ?? o['num_cocinas'] ?? 0),
+    numeroComedores: Number(
+      o['numeroComedores'] ?? o['numComedores'] ?? o['num_comedores'] ?? 0
+    ),
+    plazasGaraje: Number(o['plazasGaraje'] ?? o['plazas_garaje'] ?? 0),
     fotos,
+    ...(propietarioId != null ? { propietarioId } : {}),
   };
 }

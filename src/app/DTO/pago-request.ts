@@ -8,8 +8,11 @@ export interface PagoRequest {
   reservaId: number;
   monto: number;
   metodoPago: MetodoPago;
-  /** Si se omite, el backend puede usar la fecha actual (p. ej. POST /pagos/registro-propietario). */
+  /** Si se omite, el backend puede usar la fecha actual. */
   fechaPago?: string;
-  /** Si se omite, el backend aplica su propia política de confirmación. */
+  /**
+   * Alta por cliente: debe ser `false` hasta que el propietario confirme la recepción.
+   * Si el backend lo ignora, hay que alinear la API con este flujo.
+   */
   confirmado?: boolean;
 }

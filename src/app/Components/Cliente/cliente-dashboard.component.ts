@@ -15,7 +15,7 @@ import { ReservaService } from '../../Services/reserva.service';
 import { DormitorioService } from '../../Services/dormitorio.service';
 import { CasaRuralService } from '../../Services/casarural.service';
 import { readApiError } from '../../core/http-error.util';
-import { clearDashboardBrowserCacheOnLogout } from '../../core/browser-app-cache.util';
+import { clearClienteDashboardLocalCache } from '../../core/dashboard-browser-cache.util';
 import { decodeJwtPayload } from '../../core/auth/jwt.util';
 import { resolveFotoSrc } from '../../core/foto-url.util';
 import { CasaRuralResponse } from '../../DTO/CasaRural-response';
@@ -176,15 +176,7 @@ export class ClienteDashboardComponent {
   ];
 
   constructor() {
-    this.refrescarListadoCompleto();
-    const saved = localStorage.getItem(LS_CODIGO);
-    if (saved) {
-      const n = parseInt(saved, 10);
-      if (!Number.isNaN(n)) {
-        this.codigoForm.patchValue({ codigo: n });
-        this.cargarDatosCasa(n);
-      }
-    }
+    this.refrescarListadoCompleto({ boot: true });
     const r = sessionStorage.getItem(SS_RESERVA);
     if (r) {
       try {
@@ -333,7 +325,14 @@ export class ClienteDashboardComponent {
     return out.sort((a, b) => a.codigoCasa - b.codigoCasa);
   }
 
-  private mergeCasasFuente(api: CasaRuralResponse[]): CasaClienteCatalogo[] {
+  /**
+   * Con respuesta correcta del listado: el API es la fuente de verdad de qué códigos existen.
+   * Con `incluirSoloLocales` (fallo de red): se muestran solo datos locales, sin inventar casas del servidor.
+   */
+  private mergeCasasFuente(
+    api: CasaRuralResponse[],
+    opts?: { incluirSoloLocales?: boolean }
+  ): CasaClienteCatalogo[] {
     const map = new Map<number, CasaClienteCatalogo>();
     const add = (c: CasaClienteCatalogo) => {
       const prev = map.get(c.codigoCasa);
@@ -356,6 +355,20 @@ export class ClienteDashboardComponent {
         plazasGaraje: this.coalesceNumCat(c.plazasGaraje, prev.plazasGaraje),
       });
     };
+
+    if (opts?.incluirSoloLocales) {
+      for (const c of this.readCatalogo()) add(c);
+      for (const c of this.readPropietarioCasasLs()) add(c);
+      return Array.from(map.values()).sort((a, b) => a.codigoCasa - b.codigoCasa);
+    }
+
+    if (api.length === 0) {
+      return [];
+    }
+
+    const apiCodes = new Set(
+      api.map((r) => r.codigoCasa).filter((x) => Number.isFinite(x) && x > 0)
+    );
     for (const r of api) {
       if (!r?.codigoCasa) continue;
       add({
@@ -371,23 +384,74 @@ export class ClienteDashboardComponent {
         plazasGaraje: r.plazasGaraje,
       });
     }
-    for (const c of this.readCatalogo()) add(c);
-    for (const c of this.readPropietarioCasasLs()) add(c);
+    for (const c of this.readCatalogo()) {
+      if (apiCodes.has(c.codigoCasa)) add(c);
+    }
+    for (const c of this.readPropietarioCasasLs()) {
+      if (apiCodes.has(c.codigoCasa)) add(c);
+    }
     return Array.from(map.values()).sort((a, b) => a.codigoCasa - b.codigoCasa);
   }
 
-  private refrescarListadoCompleto() {
+  /** Si el servidor no tiene casas, no dejamos selección ni catálogo obsoleto en pantalla. */
+  private limpiarSeleccionTrasListadoVacio(): void {
+    localStorage.removeItem(LS_CODIGO);
+    sessionStorage.removeItem(SS_RESERVA);
+    this.codigoCasa.set(null);
+    this.casaDetalle.set(null);
+    this.paquetes.set([]);
+    this.dormitorios.set([]);
+    this.selectedDormId.set(null);
+    this.ultimaReserva.set(null);
+    this.codigoForm.patchValue({ codigo: 1 });
+    this.pagoForm.patchValue({ reservaId: null });
+  }
+
+  /** Tras el primer GET de listado: restaurar código guardado solo si sigue existiendo en el API. */
+  private restaurarCodigoTrasListadoInicial(): void {
+    const saved = localStorage.getItem(LS_CODIGO);
+    if (!saved) return;
+    const n = parseInt(saved, 10);
+    if (Number.isNaN(n) || n < 1) {
+      localStorage.removeItem(LS_CODIGO);
+      return;
+    }
+    const validos = new Set(this.casasListado().map((c) => c.codigoCasa));
+    if (!validos.has(n)) {
+      localStorage.removeItem(LS_CODIGO);
+      this.codigoForm.patchValue({ codigo: this.casasListado()[0]?.codigoCasa ?? 1 });
+      return;
+    }
+    this.codigoForm.patchValue({ codigo: n });
+    this.cargarDatosCasa(n);
+  }
+
+  private eliminarCodigoDelCatalogoLocal(codigo: number): void {
+    const list = this.readCatalogo().filter((x) => x.codigoCasa !== codigo);
+    this.persistCatalogo(list);
+  }
+
+  private refrescarListadoCompleto(opts?: { boot?: boolean }) {
     this.modoListadoCasas.set('general');
     this.loadingListadoCasas.set(true);
     this.casaRuralService.listarCasasDisponibles().subscribe({
       next: (api) => {
         const merged = this.mergeCasasFuente(api);
         this.casasListado.set(merged);
+        if (api.length === 0) {
+          this.persistCatalogo([]);
+          this.limpiarSeleccionTrasListadoVacio();
+        } else {
+          this.persistCatalogo(merged);
+        }
         this.loadingListadoCasas.set(false);
+        if (opts?.boot) {
+          this.restaurarCodigoTrasListadoInicial();
+        }
       },
       error: () => {
         this.loadingListadoCasas.set(false);
-        this.casasListado.set(this.mergeCasasFuente([]));
+        this.casasListado.set(this.mergeCasasFuente([], { incluirSoloLocales: true }));
       },
     });
   }
@@ -736,9 +800,10 @@ export class ClienteDashboardComponent {
     return [...map.values()].sort((a, b) => a.idPago - b.idPago);
   }
 
-  /** Suma montos de la lista cargada. */
+  /** Suma montos confirmados por el propietario (pendientes no reducen saldo). */
   protected totalPagadoReserva(): number {
     return this.pagosLista().reduce((s, p) => {
+      if (p.confirmado !== true) return s;
       const m = Number(p.monto);
       return s + (Number.isFinite(m) ? m : 0);
     }, 0);
@@ -834,6 +899,19 @@ export class ClienteDashboardComponent {
       error: (err: HttpErrorResponse) => {
         this.loadingPaquetes.set(false);
         this.setMsgCasas('err', readApiError(err));
+        if (err.status === 404) {
+          this.eliminarCodigoDelCatalogoLocal(v);
+          localStorage.removeItem(LS_CODIGO);
+          if (this.codigoCasa() === v) {
+            this.codigoCasa.set(null);
+            this.casaDetalle.set(null);
+            this.paquetes.set([]);
+            this.dormitorios.set([]);
+            this.selectedDormId.set(null);
+          }
+          this.codigoForm.patchValue({ codigo: 1 });
+          this.refrescarListadoCompleto();
+        }
       },
     });
   }
@@ -1044,12 +1122,15 @@ export class ClienteDashboardComponent {
             monto: montoJson,
             metodoPago,
             fechaPago,
-            confirmado: true,
+            confirmado: false,
           })
           .subscribe({
             next: () => {
               this.loadingPagos.set(false);
-              this.setPagoFeedback('success', 'Pago registrado correctamente.');
+              this.setPagoFeedback(
+                'success',
+                'Pago registrado. Queda pendiente de confirmación por el propietario.'
+              );
               const rid = reservaId;
               const hoy = hoyLocalISODate();
 
@@ -1086,7 +1167,7 @@ export class ClienteDashboardComponent {
   }
 
   protected logout() {
-    clearDashboardBrowserCacheOnLogout();
+    clearClienteDashboardLocalCache();
     localStorage.removeItem('token');
     void this.router.navigateByUrl('/login');
   }

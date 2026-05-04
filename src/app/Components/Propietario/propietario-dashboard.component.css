@@ -153,6 +153,16 @@
   color: var(--text-500);
 }
 
+.prop-casas__warn {
+  margin: 0 0 0.5rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.86rem;
+  background: rgba(234, 179, 8, 0.12);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  color: #713f12;
+}
+
 .prop-chips {
   display: flex;
   flex-wrap: wrap;
@@ -395,7 +405,30 @@
   margin-top: 0.15rem;
 }
 
-/* ——— Cobros reservas (propietario) ——— */
+/* ——— Pagos clientes (propietario) ——— */
+.prop-pago-intro {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--text-600, #4b5563);
+}
+
+.prop-pago-hint {
+  margin: 0 0 0.65rem;
+  font-size: 0.82rem;
+  color: var(--text-500, #6b7280);
+}
+
+.prop-pago-banner {
+  margin: 0 0 0.65rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  background: rgba(234, 179, 8, 0.12);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  color: #713f12;
+}
+
 .prop-pago-feedback {
   margin: 0 0 1rem;
   padding: 0.65rem 0.85rem;
@@ -489,13 +522,52 @@
 
 .prop-pago-card {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem 0.75rem;
-  padding: 0.55rem 0.75rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+  padding: 0.65rem 0.85rem;
   border-radius: 10px;
   background: rgba(245, 245, 220, 0.5);
   border: 1px solid rgba(160, 82, 45, 0.15);
+}
+
+.prop-pago-card--pending {
+  border-color: rgba(234, 179, 8, 0.45);
+  background: rgba(254, 252, 232, 0.65);
+}
+
+.prop-pago-card__main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.prop-pago-card__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.prop-pago-badge {
+  margin-left: auto;
+  padding: 0.28rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.prop-pago-badge--ok {
+  background: rgba(34, 197, 94, 0.16);
+  color: #14532d;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
+
+.prop-pago-badge--wait {
+  background: rgba(234, 179, 8, 0.18);
+  color: #713f12;
+  border: 1px solid rgba(234, 179, 8, 0.4);
 }
 
 .prop-pago-card__id {

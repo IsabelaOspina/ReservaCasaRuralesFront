@@ -65,7 +65,7 @@
         [class.prop-nav-btn--active]="tab() === 'cobros'"
         (click)="setTab('cobros')"
       >
-        Cobros reservas
+        Pagos clientes
       </button>
     </nav>
     <a class="prop-sidebar__link" routerLink="/login">Volver al acceso</a>
@@ -93,8 +93,18 @@
 
     <section class="prop-casas" aria-label="Tus casas">
       <h2 class="prop-casas__label">Tus casas</h2>
+      @if (avisoListaCasasApi(); as av) {
+        <p class="prop-casas__warn" role="alert">{{ av }}</p>
+      }
       @if (casasLocales().length === 0) {
-        <p class="prop-casas__empty">Aún no hay casas registradas en este dispositivo.</p>
+        @if (cargandoCasasDesdeApi()) {
+          <p class="prop-casas__empty">Cargando tus casas desde el servidor…</p>
+        } @else {
+          <p class="prop-casas__empty">
+            No hay casas que mostrar. Puedes registrar una nueva aquí abajo; si ya existen en el servidor, comprueba que
+            <code>GET /casa_rural/listar</code> responda con tu sesión (pestaña Red).
+          </p>
+        }
       } @else {
         <div class="prop-chips">
           @for (c of casasLocales(); track c.codigoCasa) {
@@ -151,7 +161,7 @@
         [class.prop-tab--active]="tab() === 'cobros'"
         (click)="setTab('cobros')"
       >
-        Cobros reservas
+        Pagos clientes
       </button>
     </nav>
 
@@ -583,7 +593,11 @@
 
         @if (tab() === 'cobros') {
           <article class="card">
-            <h2 class="card__title">Registrar cobro recibido</h2>
+            <h2 class="card__title">Pagos de clientes</h2>
+            <p class="prop-pago-intro">
+              El cliente registra el pago desde su panel. Aquí ves los movimientos de la reserva y solo debes
+              <strong>confirmar</strong> los que hayas recibido en cuenta.
+            </p>
             @if (propPagoMensaje(); as pm) {
               <p
                 class="prop-pago-feedback"
@@ -594,10 +608,10 @@
                 {{ pm.texto }}
               </p>
             }
-            <form [formGroup]="propPagoForm" class="card__form-block" (ngSubmit)="registrarPagoPropietario()">
+            <form [formGroup]="propPagoForm" class="card__form-block" (ngSubmit)="consultarReservaPagosProp()">
               <div class="form-grid">
                 <label class="form-field">
-                  <span class="form-label">ID reserva</span>
+                  <span class="form-label">ID de reserva</span>
                   <input
                     type="number"
                     min="1"
@@ -615,25 +629,19 @@
                 </label>
                 <div class="form-field span-2 prop-pago-actions">
                   <button
-                    type="button"
-                    class="btn btn--secondary"
-                    (click)="cargarInfoPagoProp()"
-                    [disabled]="loadingPagosProp()"
+                    type="submit"
+                    class="btn btn--primary"
+                    [disabled]="!puedeConsultarReservaPagosProp()"
                   >
-                    Datos para transferencia
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn--secondary"
-                    (click)="listarPagosReservaProp()"
-                    [disabled]="loadingPagosProp()"
-                  >
-                    Ver pagos de la reserva
+                    {{ loadingPagosProp() ? 'Cargando…' : 'Consultar reserva' }}
                   </button>
                 </div>
                 @if (propPagoInfo(); as info) {
                   <div class="prop-pago-summary span-2" role="region" aria-label="Resumen de importes">
                     <h3 class="card__subtitle">Resumen de importes</h3>
+                    <p class="prop-pago-hint">
+                      El saldo restante cuenta solo pagos <strong>ya confirmados</strong> por ti.
+                    </p>
                     <div class="prop-pago-stats">
                       <div>
                         <span class="prop-pago-stat__label">Total a pagar</span>
@@ -652,7 +660,7 @@
                       </div>
                     </div>
                     <div class="prop-pago-bank">
-                      <span class="prop-pago-bank__head">Datos bancarios</span>
+                      <span class="prop-pago-bank__head">Datos bancarios (para el cliente)</span>
                       <p><span class="prop-pago-bank__k">Banco</span> {{ info.banco }}</p>
                       <p>
                         <span class="prop-pago-bank__k">Cuenta</span>
@@ -662,62 +670,46 @@
                   </div>
                 }
                 @if (propPagosLista().length) {
-                  <div class="prop-pago-list span-2" role="region" aria-label="Pagos registrados">
-                    <h3 class="card__subtitle">Pagos de esta reserva</h3>
+                  <div class="prop-pago-list span-2" role="region" aria-label="Pagos de la reserva">
+                    <h3 class="card__subtitle">Pagos registrados por el cliente</h3>
+                    @if (pagosPendientesProp().length) {
+                      <p class="prop-pago-banner" role="status">
+                        {{ pagosPendientesProp().length }} pago(s) pendiente(s) de tu confirmación.
+                      </p>
+                    }
                     <ul class="prop-pago-cards">
                       @for (pg of propPagosLista(); track pg.idPago) {
-                        <li class="prop-pago-card">
-                          <span class="prop-pago-card__id">#{{ pg.idPago }}</span>
-                          <span class="prop-pago-card__amount">{{ pg.monto | number: '1.2-2' }} €</span>
-                          <span class="prop-pago-chip">{{ etiquetaMetodoPagoProp(pg.metodoPago) }}</span>
-                          <span class="prop-pago-chip">{{ pg.fechaPago }}</span>
+                        <li class="prop-pago-card" [class.prop-pago-card--pending]="pg.confirmado !== true">
+                          <div class="prop-pago-card__main">
+                            <span class="prop-pago-card__id">Pago #{{ pg.idPago }}</span>
+                            <span class="prop-pago-card__amount">{{ pg.monto | number: '1.2-2' }} €</span>
+                            <span class="prop-pago-chip">{{ etiquetaMetodoPagoProp(pg.metodoPago) }}</span>
+                            <span class="prop-pago-chip">{{ pg.fechaPago }}</span>
+                            <span
+                              class="prop-pago-badge"
+                              [class.prop-pago-badge--ok]="pg.confirmado === true"
+                              [class.prop-pago-badge--wait]="pg.confirmado !== true"
+                            >
+                              {{ pg.confirmado === true ? 'Confirmado' : 'Pendiente' }}
+                            </span>
+                          </div>
+                          @if (pg.confirmado !== true) {
+                            <div class="prop-pago-card__actions">
+                              <button
+                                type="button"
+                                class="btn btn--secondary btn--sm"
+                                (click)="confirmarRecepcionPagoProp(pg.idPago)"
+                                [disabled]="confirmandoPago(pg.idPago)"
+                              >
+                                {{ confirmandoPago(pg.idPago) ? 'Confirmando…' : 'Confirmar recepción' }}
+                              </button>
+                            </div>
+                          }
                         </li>
                       }
                     </ul>
                   </div>
                 }
-                <h3 class="card__subtitle span-2">Registrar cobro</h3>
-                <label class="form-field">
-                  <span class="form-label">Monto (€)</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    formControlName="monto"
-                    [class.input--invalid]="fieldStatePropPago('monto') === 'invalid'"
-                    [class.input--valid]="fieldStatePropPago('monto') === 'valid'"
-                  />
-                </label>
-                <label class="form-field">
-                  <span class="form-label">Método</span>
-                  <select formControlName="metodoPago">
-                    @for (m of metodosPagoProp; track m) {
-                      <option [ngValue]="m">{{ m }}</option>
-                    }
-                  </select>
-                </label>
-                <label class="form-field span-2">
-                  <span class="form-label">Fecha del cobro (opcional)</span>
-                  <input
-                    type="date"
-                    formControlName="fechaPago"
-                    [attr.min]="fechaMinimaPagoProp()"
-                    [class.input--invalid]="fieldStatePropPago('fechaPago') === 'invalid'"
-                    [class.input--valid]="fieldStatePropPago('fechaPago') === 'valid'"
-                  />
-                  <span class="form-hint">Si la dejas vacía, el servidor usará la fecha actual.</span>
-                  @if (
-                    propPagoForm.get('fechaPago')?.hasError('fechaPagoPasada') &&
-                    (propPagoForm.get('fechaPago')?.dirty || propPagoForm.get('fechaPago')?.touched)
-                  ) {
-                    <span class="form-error" role="alert">La fecha no puede ser anterior a hoy.</span>
-                  }
-                </label>
-              </div>
-              <div class="form-actions">
-                <button type="submit" class="btn btn--primary btn--block" [disabled]="!canRegistrarPagoProp()">
-                  {{ loadingPagosProp() ? 'Procesando…' : 'Confirmar cobro en reserva' }}
-                </button>
               </div>
             </form>
           </article>

@@ -484,6 +484,9 @@
           @if (pagosLista().length) {
             <div class="cli__pagos-list-wrap" role="region" aria-label="Pagos registrados">
               <h3 class="cli__pagos-list__title">Pagos de esta reserva</h3>
+              <p class="cli__pagos-hint">
+                Los importes en «Pendiente» no cuentan en el saldo hasta que el propietario confirme la recepción.
+              </p>
               <ul class="cli__pagos-cards">
                 @for (pg of pagosLista(); track pg.idPago) {
                   <li class="cli__pago-card">

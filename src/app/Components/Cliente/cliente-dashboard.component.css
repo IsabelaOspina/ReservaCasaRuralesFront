@@ -849,6 +849,13 @@
   color: var(--rural-earth);
 }
 
+.cli__pagos-hint {
+  margin: -0.35rem 0 0.65rem;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--text-500, #6b7280);
+}
+
 .cli__pagos-cards {
   list-style: none;
   margin: 0;
