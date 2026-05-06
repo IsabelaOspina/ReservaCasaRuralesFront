@@ -7,5 +7,7 @@
 export const environment = {
   production: false,
   apiUrl: '/api',
-  apiBaseUrl: 'http://localhost:8080',
+   /**apiBaseUrl: 'http://localhost:8080',*/
+  apiBaseUrl: 'https://reservacasarurales-production.up.railway.app',
+
 };
