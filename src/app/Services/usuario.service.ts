@@ -15,7 +15,9 @@ export class UsuarioService {
 
   private apiUrl = `${environment.apiUrl}/usuario`;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) {
+    console.log("API URL FINAL", this.apiUrl);
+    }
 
 
   // LOGIN — respuesta 200: texto plano "token:<JWT>"
